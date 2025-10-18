@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,7 @@ import {
 } from "react-native";
 
 import { useAuth } from "../../hooks/auth";
+import RecaptchaModal from "../../components/RecaptchaModal";
 
 const COLORS = {
   primary: "#0d6efd",   // azul bootstrap
@@ -32,34 +33,30 @@ const SignInScreen = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [captchaQuestion, setCaptchaQuestion] = useState("");
-  const [captchaAnswer, setCaptchaAnswer] = useState("");
-  const [captchaInput, setCaptchaInput] = useState("");
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const recaptchaRef = useRef(null);
 
-  const generateCaptcha = () => {
-    const a = Math.floor(Math.random() * 9) + 1;
-    const b = Math.floor(Math.random() * 9) + 1;
-    setCaptchaQuestion(`¿Cuánto es ${a} + ${b}?`);
-    setCaptchaAnswer(String(a + b));
-    setCaptchaInput("");
+  const handleRecaptchaVerify = (token) => {
+    setCaptchaToken(token);
+    Alert.alert("Verificación completada", "reCAPTCHA resuelto correctamente");
   };
 
-  useEffect(() => {
-    generateCaptcha();
-  }, []);
+  const handleRecaptchaExpire = () => {
+    setCaptchaToken(null);
+    Alert.alert(
+      "Verificación requerida",
+      "El reCAPTCHA ha expirado, inténtalo nuevamente"
+    );
+  };
 
   const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert("Campos requeridos", "Por favor completa email y contraseña");
       return;
     }
-    if (!captchaInput.trim()) {
-      Alert.alert("Verificación", "Resuelve el captcha para continuar");
-      return;
-    }
-    if (captchaInput.trim() !== captchaAnswer) {
-      Alert.alert("Captcha incorrecto", "Inténtalo nuevamente");
-      generateCaptcha();
+    if (!captchaToken) {
+      Alert.alert("Verificación", "Completa el reCAPTCHA antes de continuar");
+      recaptchaRef.current?.open();
       return;
     }
     try {
@@ -199,52 +196,54 @@ const SignInScreen = () => {
                 borderColor: "#dee2e6",
                 borderRadius: 10,
                 marginBottom: 18,
-                padding: 12,
+                padding: 16,
                 backgroundColor: COLORS.background,
               }}
             >
               <View
                 style={{
                   flexDirection: "row",
-                  justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 10,
+                  justifyContent: "space-between",
                 }}
               >
-                <Text
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text
+                    style={{
+                      color: COLORS.text,
+                      fontWeight: "600",
+                      fontSize: 14,
+                      marginBottom: 6,
+                    }}
+                  >
+                    Protección reCAPTCHA
+                  </Text>
+                  <Text style={{ color: COLORS.textLight, fontSize: 13 }}>
+                    {captchaToken
+                      ? "Verificación completada"
+                      : "Pulsa el botón para validar que no eres un robot"}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => recaptchaRef.current?.open()}
                   style={{
-                    color: COLORS.text,
-                    fontWeight: "600",
-                    fontSize: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    backgroundColor: captchaToken ? "#198754" : COLORS.primary,
                   }}
                 >
-                  {captchaQuestion}
-                </Text>
-                <TouchableOpacity onPress={generateCaptcha}>
-                  <Ionicons name="refresh" size={20} color={COLORS.primary} />
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontWeight: "700",
+                      fontSize: 13,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {captchaToken ? "Verificado" : "Verificar"}
+                  </Text>
                 </TouchableOpacity>
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                <Ionicons name="shield-checkmark" size={22} color={COLORS.primary} />
-                <TextInput
-                  style={{
-                    flex: 1,
-                    marginLeft: 10,
-                    paddingVertical: 8,
-                    color: COLORS.text,
-                    fontSize: 15,
-                  }}
-                  placeholder="Escribe el resultado"
-                  placeholderTextColor={COLORS.textLight}
-                  keyboardType="number-pad"
-                  value={captchaInput}
-                  onChangeText={setCaptchaInput}
-                />
               </View>
             </View>
 
@@ -301,6 +300,17 @@ const SignInScreen = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <RecaptchaModal
+        ref={recaptchaRef}
+        onVerify={handleRecaptchaVerify}
+        onExpire={handleRecaptchaExpire}
+        onError={() =>
+          Alert.alert(
+            "Error",
+            "No pudimos cargar el reCAPTCHA. Por favor, inténtalo de nuevo"
+          )
+        }
+      />
     </LinearGradient>
   );
 };
