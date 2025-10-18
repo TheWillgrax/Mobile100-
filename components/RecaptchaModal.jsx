@@ -2,6 +2,8 @@ import { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from 
 import { ActivityIndicator, Modal, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
+import { useTheme } from "../hooks/theme";
+
 const DEFAULT_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
@@ -36,22 +38,6 @@ const buildHtml = (siteKey) => `<!DOCTYPE html>
         }
       };
 
-      window.onRecaptchaLoad = function () {
-        sendMessage({ type: "loaded" });
-      };
-
-      window.onCaptchaSuccess = function (token) {
-        sendMessage({ type: "success", token });
-      };
-
-      window.onCaptchaExpired = function () {
-        sendMessage({ type: "expired" });
-      };
-
-      window.onCaptchaError = function () {
-        sendMessage({ type: "error" });
-      };
-
       const renderCaptcha = () => {
         if (!window.grecaptcha || !window.grecaptcha.render) {
           setTimeout(renderCaptcha, 300);
@@ -59,6 +45,9 @@ const buildHtml = (siteKey) => `<!DOCTYPE html>
         }
 
         try {
+          const container = document.getElementById("captcha-container");
+          if (!container) return;
+          container.innerHTML = "";
           window.grecaptcha.render("captcha-container", {
             sitekey: "${siteKey}",
             callback: onCaptchaSuccess,
@@ -70,7 +59,30 @@ const buildHtml = (siteKey) => `<!DOCTYPE html>
         }
       };
 
-      document.addEventListener("DOMContentLoaded", renderCaptcha);
+      window.onRecaptchaLoad = function () {
+        sendMessage({ type: "loaded" });
+        renderCaptcha();
+      };
+
+      window.onCaptchaSuccess = function (token) {
+        sendMessage({ type: "success", token });
+      };
+
+      window.onCaptchaExpired = function () {
+        sendMessage({ type: "expired" });
+        renderCaptcha();
+      };
+
+      window.onCaptchaError = function () {
+        sendMessage({ type: "error" });
+        renderCaptcha();
+      };
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          renderCaptcha();
+        }
+      });
     </script>
   </head>
   <body>
@@ -78,13 +90,53 @@ const buildHtml = (siteKey) => `<!DOCTYPE html>
   </body>
 </html>`;
 
+const createStyles = (theme) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
+    card: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      overflow: "hidden",
+      width: "100%",
+      maxWidth: 380,
+      minHeight: 160,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    loader: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 1,
+      backgroundColor: theme.card,
+      opacity: 0.85,
+    },
+    webview: {
+      height: 220,
+    },
+  });
+
 const RecaptchaModal = forwardRef(({ siteKey = DEFAULT_SITE_KEY, onVerify, onExpire, onError }, ref) => {
+  const { theme } = useTheme();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [webviewKey, setWebviewKey] = useState(0);
 
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const html = useMemo(() => buildHtml(siteKey), [siteKey]);
 
   const open = useCallback(() => {
+    setWebviewKey((key) => key + 1);
     setVisible(true);
     setLoading(true);
   }, []);
@@ -120,19 +172,20 @@ const RecaptchaModal = forwardRef(({ siteKey = DEFAULT_SITE_KEY, onVerify, onExp
         onError?.();
       }
     },
-    [close, onError, onExpire, onVerify, setLoading]
+    [close, onError, onExpire, onVerify]
   );
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={close}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={close}>
       <View style={styles.overlay}>
         <View style={styles.card}>
           {loading && (
             <View style={styles.loader}>
-              <ActivityIndicator size="large" color="#0d6efd" />
+              <ActivityIndicator size="large" color={theme.primary} />
             </View>
           )}
           <WebView
+            key={webviewKey}
             originWhitelist={["*"]}
             source={{ html }}
             onLoadEnd={() => setLoading(false)}
@@ -148,38 +201,6 @@ const RecaptchaModal = forwardRef(({ siteKey = DEFAULT_SITE_KEY, onVerify, onExp
       </View>
     </Modal>
   );
-});
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    overflow: "hidden",
-    width: "100%",
-    maxWidth: 380,
-    minHeight: 160,
-  },
-  loader: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-    backgroundColor: "rgba(255,255,255,0.85)",
-  },
-  webview: {
-    height: 200,
-  },
 });
 
 RecaptchaModal.displayName = "RecaptchaModal";

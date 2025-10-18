@@ -21,15 +21,8 @@ export function NearbyProviders({
   limit = 10,
   isTab = false // Nueva prop para modo pestaña
 }) {
-  const { 
-    nearbyProviders, 
-    loading, 
-    error, 
-    userLocation,
-    userAddress,
-    refetch,
-    stats 
-  } = useNearbyProviders(maxDistance, limit);
+  const { nearbyProviders, loading, error, userLocation, userAddress, refetch } =
+    useNearbyProviders(maxDistance, limit);
 
   const [refreshing, setRefreshing] = React.useState(false);
 

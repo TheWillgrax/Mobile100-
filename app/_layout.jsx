@@ -2,20 +2,24 @@
 import { Slot } from "expo-router";
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { AuthProvider } from "../hooks/auth";
+import { ThemeProvider } from "./providers/ThemeProvider";
 import { CartProvider } from "./providers/CartProvider";
 import { LocationProvider } from "./providers/LocationProvider";
-import { AuthProvider } from "../hooks/auth";
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <LocationProvider>
-          <SafeAreaView style={{ flex: 1 }}>
-            <Slot />
-          </SafeAreaView>
-        </LocationProvider>
-      </CartProvider>
+      <ThemeProvider>
+        <CartProvider>
+          <LocationProvider>
+            <SafeAreaView style={{ flex: 1 }}>
+              <Slot />
+            </SafeAreaView>
+          </LocationProvider>
+        </CartProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 }

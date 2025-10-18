@@ -1,29 +1,45 @@
 // app/(tabs)/_layout.jsx
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { StyleSheet } from "react-native";
+import { useMemo } from "react";
 
+import { useTheme } from "../../hooks/theme";
 import { useCart } from "../providers/CartProvider";
 
 export default function TabsLayout() {
   const { itemCount } = useCart();
+  const { theme, isDark } = useTheme();
+
+  const screenOptions = useMemo(
+    () => ({
+      headerShown: false,
+      tabBarActiveTintColor: theme.primary,
+      tabBarInactiveTintColor: isDark ? theme.textLight : "#AFC5FF",
+      tabBarStyle: {
+        height: 75,
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        borderTopWidth: 0,
+        elevation: 5,
+        backgroundColor: theme.card,
+        shadowColor: theme.shadow,
+        shadowOpacity: 0.2,
+        shadowOffset: { width: 0, height: -3 },
+        shadowRadius: 5,
+      },
+      tabBarLabelStyle: {
+        fontSize: 12,
+        fontWeight: "bold",
+      },
+      tabBarItemStyle: {
+        paddingVertical: 5,
+      },
+    }),
+    [isDark, theme]
+  );
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: "#ffd700", // iconos activos dorados
-        tabBarInactiveTintColor: "#c0e0ff", // iconos inactivos azul claro
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "bold",
-        },
-        tabBarItemStyle: {
-          paddingVertical: 5,
-        },
-      }}
-    >
+    <Tabs screenOptions={screenOptions}>
       <Tabs.Screen
         name="index"
         options={{
@@ -59,7 +75,13 @@ export default function TabsLayout() {
             <Ionicons name="cart-outline" size={size + 2} color={color} />
           ),
           tabBarBadge: itemCount > 0 ? Math.min(itemCount, 99) : undefined,
-          tabBarBadgeStyle: styles.badge,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.danger,
+            color: theme.white,
+            fontSize: 12,
+            minWidth: 20,
+            paddingHorizontal: 4,
+          },
         }}
       />
       <Tabs.Screen
@@ -71,28 +93,15 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Perfil",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-circle-outline" size={size + 2} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    height: 75,
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    borderTopWidth: 0,
-    elevation: 5,
-    backgroundColor: "#1e3c72", // azul degradado simulado
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: -3 },
-    shadowRadius: 5,
-  },
-  badge: {
-    backgroundColor: "#ff5a5f",
-    color: "#fff",
-    fontSize: 12,
-    minWidth: 20,
-    paddingHorizontal: 4,
-  },
-});

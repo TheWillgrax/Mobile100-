@@ -2,19 +2,23 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { recipeStyles } from "../../assets/styles/recipe-detail.styles";
+import { createRecipeStyles } from "../../assets/styles/recipe-detail.styles";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import { COLORS } from "../../constants/colors";
+import { useTheme } from "../../hooks/theme";
+import { responsiveFontSize } from "../../utils/responsive";
 import { isFavorite, toggleFavorite } from "../../services/favorites";
-import { MealAPI } from "../../services/mealAPI"; // si luego usas PartsAPI, cámbialo aquí
+import { MealAPI } from "../../services/mealAPI";
 import { useCart } from "../providers/CartProvider";
 
 export default function ProductDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { theme } = useTheme();
+  const recipeStyles = useMemo(() => createRecipeStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [item, setItem] = useState(null);
   const [fav, setFav] = useState(false);
@@ -26,7 +30,7 @@ export default function ProductDetailScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const raw = await MealAPI.getMealById(id); // PartsAPI.getById(id) si migras
+        const raw = await MealAPI.getMealById(id);
         const data = MealAPI.transformMealData ? MealAPI.transformMealData(raw) : raw;
         setItem(data);
 
@@ -52,7 +56,6 @@ export default function ProductDetailScreen() {
 
   if (loading || !item) return <LoadingSpinner message="Loading item..." />;
 
-  // Mapeo flexible para “recetas” o “autopartes”
   const price = item.price ?? item.cookTime ?? "—";
   const stock = item.stock ?? item.servings ?? "—";
   const brand = item.brand ?? item.area ?? null;
@@ -72,21 +75,19 @@ export default function ProductDetailScreen() {
   return (
     <View style={styles.wrapper}>
       <ScrollView style={recipeStyles.container} showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={recipeStyles.header}>
           <TouchableOpacity onPress={() => router.back()} style={recipeStyles.iconButton}>
-            <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+            <Ionicons name="arrow-back" size={22} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity onPress={onToggleFavorite} style={recipeStyles.iconButton}>
             <Ionicons
               name={fav ? "heart" : "heart-outline"}
               size={24}
-              color={fav ? COLORS.primary : COLORS.text}
+              color={fav ? theme.primary : theme.text}
             />
           </TouchableOpacity>
         </View>
 
-        {/* Imagen en tarjeta simple */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
           {!!item.image && (
             <Image
@@ -98,39 +99,38 @@ export default function ProductDetailScreen() {
           )}
         </View>
 
-        {/* Título + meta (Precio / Stock / Marca) */}
         <View style={recipeStyles.headerContent}>
           <Text style={recipeStyles.title}>{item.title}</Text>
 
           <View style={recipeStyles.metaRow}>
             <View style={recipeStyles.metaItem}>
-              <Ionicons name="pricetag-outline" size={18} color={COLORS.textLight} />
+              <Ionicons name="pricetag-outline" size={18} color={theme.textLight} />
               <Text style={recipeStyles.metaText}>{price}</Text>
             </View>
             <View style={recipeStyles.metaItem}>
-              <Ionicons name="cube-outline" size={18} color={COLORS.textLight} />
+              <Ionicons name="cube-outline" size={18} color={theme.textLight} />
               <Text style={recipeStyles.metaText}>{stock}</Text>
             </View>
             {!!brand && (
               <View style={recipeStyles.metaItem}>
-                <Ionicons name="build-outline" size={18} color={COLORS.textLight} />
+                <Ionicons name="build-outline" size={18} color={theme.textLight} />
                 <Text style={recipeStyles.metaText}>{brand}</Text>
               </View>
             )}
           </View>
         </View>
 
-        {/* Especificaciones */}
         {Array.isArray(specs) && specs.length > 0 && (
           <View style={recipeStyles.section}>
             <Text style={recipeStyles.sectionTitle}>Especificaciones</Text>
             {specs.map((line, idx) => (
-              <Text key={idx} style={recipeStyles.listItem}>• {line}</Text>
+              <Text key={idx} style={recipeStyles.listItem}>
+                • {line}
+              </Text>
             ))}
           </View>
         )}
 
-        {/* Compatibilidad / Notas */}
         {Array.isArray(notes) && notes.length > 0 && (
           <View style={recipeStyles.section}>
             <Text style={recipeStyles.sectionTitle}>Compatibilidad / Notas</Text>
@@ -151,16 +151,16 @@ export default function ProductDetailScreen() {
 
         <View style={styles.quantityControls}>
           <TouchableOpacity style={styles.roundButton} onPress={decrease}>
-            <Ionicons name="remove" size={18} color={COLORS.white} />
+            <Ionicons name="remove" size={18} color={theme.white} />
           </TouchableOpacity>
           <Text style={styles.quantity}>{quantity}</Text>
           <TouchableOpacity style={styles.roundButton} onPress={increase}>
-            <Ionicons name="add" size={18} color={COLORS.white} />
+            <Ionicons name="add" size={18} color={theme.white} />
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.addButton} onPress={handleAddToCart}>
-          <Ionicons name="cart" size={20} color={COLORS.white} />
+          <Ionicons name="cart" size={20} color={theme.white} />
           <Text style={styles.addButtonText}>Agregar al carrito</Text>
         </TouchableOpacity>
       </View>
@@ -168,67 +168,68 @@ export default function ProductDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.card,
-  },
-  priceInfo: {
-    flex: 1,
-  },
-  totalLabel: {
-    fontSize: 14,
-    color: COLORS.textLight,
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginTop: 4,
-  },
-  quantityControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  roundButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: COLORS.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  quantity: {
-    minWidth: 28,
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.text,
-  },
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 999,
-    gap: 8,
-  },
-  addButtonText: {
-    color: COLORS.white,
-    fontWeight: "700",
-    fontSize: 16,
-  },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    wrapper: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    footer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+    },
+    priceInfo: {
+      flex: 1,
+    },
+    totalLabel: {
+      fontSize: responsiveFontSize(13),
+      color: theme.textLight,
+    },
+    totalValue: {
+      fontSize: responsiveFontSize(18),
+      fontWeight: "700",
+      color: theme.text,
+      marginTop: 4,
+    },
+    quantityControls: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    roundButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: theme.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    quantity: {
+      minWidth: 32,
+      textAlign: "center",
+      fontSize: responsiveFontSize(16),
+      fontWeight: "700",
+      color: theme.text,
+    },
+    addButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: theme.primary,
+      borderRadius: 12,
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+    },
+    addButtonText: {
+      color: theme.white,
+      fontSize: responsiveFontSize(14),
+      fontWeight: "700",
+      textTransform: "uppercase",
+    },
+  });

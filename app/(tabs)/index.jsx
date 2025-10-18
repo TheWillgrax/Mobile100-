@@ -2,14 +2,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { homeStyles } from "../../assets/styles/home.styles";
+
+import { createHomeStyles } from "../../assets/styles/home.styles";
 import CategoryFilter from "../../components/CategoryFilter";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import RecipeCard from "../../components/RecipeCard";
 import SafeScreen from "../../components/SafeScreen";
-import { COLORS } from "../../constants/colors";
+import { useTheme } from "../../hooks/theme";
 import { useAuth } from "../../hooks/auth";
 import { MealAPI } from "../../services/mealAPI";
 
@@ -18,6 +19,9 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const HomeScreen = () => {
   const router = useRouter();
   const { session, signOut, isAuthenticated } = useAuth();
+  const { theme } = useTheme();
+  const homeStyles = useMemo(() => createHomeStyles(theme), [theme]);
+
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [recipes, setRecipes] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -25,7 +29,7 @@ const HomeScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -44,7 +48,9 @@ const HomeScreen = () => {
 
       setCategories(transformedCategories);
 
-      if (!selectedCategory) setSelectedCategory(transformedCategories[0].name);
+      if (!selectedCategory && transformedCategories.length > 0) {
+        setSelectedCategory(transformedCategories[0].name);
+      }
 
       const transformedMeals = randomMeals
         .map((meal) => MealAPI.transformMealData(meal))
@@ -59,9 +65,9 @@ const HomeScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCategory]);
 
-  const loadCategoryData = async (category) => {
+  const loadCategoryData = useCallback(async (category) => {
     try {
       const meals = await MealAPI.filterByCategory(category);
       const transformedMeals = meals
@@ -72,22 +78,26 @@ const HomeScreen = () => {
       console.error("Error loading category data:", error);
       setRecipes([]);
     }
-  };
+  }, []);
 
-  const handleCategorySelect = async (category) => {
-    setSelectedCategory(category);
-    await loadCategoryData(category);
-  };
+  const handleCategorySelect = useCallback(
+    async (category) => {
+      setSelectedCategory(category);
+      await loadCategoryData(category);
+    },
+    [loadCategoryData]
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
+    await sleep(400);
     setRefreshing(false);
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const displayName = useMemo(() => {
     if (!session?.user) return "Usuario";
@@ -110,7 +120,7 @@ const HomeScreen = () => {
     }
   };
 
-  if (loading && !refreshing) return <LoadingSpinner message="Loading delicious recipes..." />;
+  if (loading && !refreshing) return <LoadingSpinner message="Cargando autopartes..." />;
 
   return (
     <SafeScreen>
@@ -120,12 +130,11 @@ const HomeScreen = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={COLORS.primary}
+            tintColor={theme.primary}
           />
         }
         contentContainerStyle={homeStyles.scrollContent}
       >
-        {/* CONTENIDO ORIGINAL SIN PROVEEDORES CERCANOS */}
         <View style={homeStyles.welcomeSection}>
           <View style={homeStyles.welcomeTextContainer}>
             <Text style={homeStyles.welcomeText}>
@@ -142,7 +151,7 @@ const HomeScreen = () => {
             <Ionicons
               name={isAuthenticated ? "log-out-outline" : "log-in-outline"}
               size={20}
-              color={COLORS.white}
+              color={theme.white}
             />
             <Text style={homeStyles.signInButtonText}>
               {isAuthenticated ? "Cerrar sesión" : "Iniciar sesión"}
@@ -151,12 +160,11 @@ const HomeScreen = () => {
         </View>
 
         <View style={homeStyles.welcomeIcons}>
-          <Ionicons name="car-outline" size={80} color="#444" />
-          <Ionicons name="construct-outline" size={80} color="#444" />
-          <Ionicons name="settings-outline" size={80} color="#444" />
+          <Ionicons name="car-outline" size={80} color={theme.textLight} />
+          <Ionicons name="construct-outline" size={80} color={theme.textLight} />
+          <Ionicons name="settings-outline" size={80} color={theme.textLight} />
         </View>
 
-        {/* FEATURED SECTION */}
         {featuredRecipe && (
           <View style={homeStyles.featuredSection}>
             <TouchableOpacity
@@ -173,7 +181,7 @@ const HomeScreen = () => {
                 />
                 <View style={homeStyles.featuredOverlay}>
                   <View style={homeStyles.featuredBadge}>
-                    <Text style={homeStyles.featuredBadgeText}>Featured</Text>
+                    <Text style={homeStyles.featuredBadgeText}>Destacado</Text>
                   </View>
 
                   <View style={homeStyles.featuredContent}>
@@ -183,16 +191,16 @@ const HomeScreen = () => {
 
                     <View style={homeStyles.featuredMeta}>
                       <View style={homeStyles.metaItem}>
-                        <Ionicons name="time-outline" size={16} color={COLORS.white} />
+                        <Ionicons name="time-outline" size={16} color={theme.white} />
                         <Text style={homeStyles.metaText}>{featuredRecipe.cookTime}</Text>
                       </View>
                       <View style={homeStyles.metaItem}>
-                        <Ionicons name="people-outline" size={16} color={COLORS.white} />
+                        <Ionicons name="people-outline" size={16} color={theme.white} />
                         <Text style={homeStyles.metaText}>{featuredRecipe.servings}</Text>
                       </View>
                       {featuredRecipe.area && (
                         <View style={homeStyles.metaItem}>
-                          <Ionicons name="location-outline" size={16} color={COLORS.white} />
+                          <Ionicons name="location-outline" size={16} color={theme.white} />
                           <Text style={homeStyles.metaText}>{featuredRecipe.area}</Text>
                         </View>
                       )}
@@ -204,36 +212,44 @@ const HomeScreen = () => {
           </View>
         )}
 
-        {categories.length > 0 && (
-          <CategoryFilter
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onSelectCategory={handleCategorySelect}
-          />
-        )}
-
         <View style={homeStyles.recipesSection}>
           <View style={homeStyles.sectionHeader}>
-            <Text style={homeStyles.sectionTitle}>{selectedCategory}</Text>
+            <Text style={homeStyles.sectionTitle}>Explora por categoría</Text>
           </View>
 
-          {recipes.length > 0 ? (
-            <FlatList
-              data={recipes}
-              renderItem={({ item }) => <RecipeCard recipe={item} />}
-              keyExtractor={(item) => item.id.toString()}
-              numColumns={2}
-              columnWrapperStyle={homeStyles.row}
-              contentContainerStyle={homeStyles.recipesGrid}
-              scrollEnabled={false}
+          {categories.length > 0 && (
+            <CategoryFilter
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onSelectCategory={handleCategorySelect}
+              styles={homeStyles}
             />
-          ) : (
-            <View style={homeStyles.emptyState}>
-              <Ionicons name="restaurant-outline" size={64} color={COLORS.textLight} />
-              <Text style={homeStyles.emptyTitle}>No recipes found</Text>
-              <Text style={homeStyles.emptyDescription}>Try a different category</Text>
-            </View>
           )}
+        </View>
+
+        <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+          <View style={homeStyles.sectionHeader}>
+            <Text style={homeStyles.sectionTitle}>Recomendados para ti</Text>
+          </View>
+
+          <FlatList
+            data={recipes}
+            keyExtractor={(item) => item.id?.toString()}
+            renderItem={({ item }) => <RecipeCard recipe={item} />}
+            numColumns={2}
+            scrollEnabled={false}
+            contentContainerStyle={{ paddingBottom: 32 }}
+            columnWrapperStyle={homeStyles.row}
+            ListEmptyComponent={() => (
+              <View style={homeStyles.emptyState}>
+                <Ionicons name="restaurant-outline" size={64} color={theme.textLight} />
+                <Text style={homeStyles.emptyTitle}>Sin resultados</Text>
+                <Text style={homeStyles.emptyDescription}>
+                  Intenta refrescar la página o seleccionar otra categoría.
+                </Text>
+              </View>
+            )}
+          />
         </View>
       </ScrollView>
     </SafeScreen>
