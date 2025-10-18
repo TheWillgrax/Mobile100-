@@ -18,11 +18,17 @@ import {
 import RecaptchaModal from "../../components/RecaptchaModal";
 import { useTheme } from "../../hooks/theme";
 import { responsiveFontSize } from "../../utils/responsive";
+import { RECAPTCHA_CONFIG } from "../../utils/config";
 
 const SignUpScreen = () => {
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const gradientColors = useMemo(
+    () => [theme.primary, theme.secondary ?? theme.primary, theme.background],
+    [theme]
+  );
+  const { siteKey, domain, language } = RECAPTCHA_CONFIG;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,6 +36,17 @@ const SignUpScreen = () => {
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState(null);
   const recaptchaRef = useRef(null);
+
+  const handleRecaptchaError = (message) => {
+    const errorMessage =
+      message && typeof message === "string"
+        ? message
+        : "No pudimos cargar el reCAPTCHA. Comprueba tu conexión e inténtalo de nuevo.";
+    Alert.alert(
+      "Error con reCAPTCHA",
+      `${errorMessage}\nVerifica que el dominio autorizado para tu clave incluya ${domain}.`
+    );
+  };
 
   const handleRecaptchaVerify = (token) => {
     setCaptchaToken(token);
@@ -64,10 +81,10 @@ const SignUpScreen = () => {
     }, 800);
   };
 
-  const gradientColors = [theme.primary, theme.secondary ?? theme.primary];
-
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
+      <View style={styles.decorativeBlob} />
+      <View style={styles.decorativeAccent} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
@@ -75,55 +92,69 @@ const SignUpScreen = () => {
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.logoContainer}>
-            <Ionicons name="car-sport" size={100} color={theme.white} />
-            <Text style={styles.logoTitle}>AutoParts</Text>
-            <Text style={styles.logoSubtitle}>Crea tu cuenta fácilmente</Text>
+          <View style={styles.heroContainer}>
+            <View style={styles.heroBadge}>
+              <Ionicons name="sparkles" size={24} color={theme.primary} />
+              <Text style={styles.heroBadgeText}>Nuevo registro</Text>
+            </View>
+            <Text style={styles.heroTitle}>Crea tu cuenta</Text>
+            <Text style={styles.heroSubtitle}>
+              Diseñamos esta experiencia para que configurar tu acceso sea rápido y seguro.
+            </Text>
           </View>
 
           <View style={styles.formCard}>
-            <View style={styles.inputRow}>
-              <Ionicons name="mail" size={24} color={theme.primary} />
-              <TextInput
-                style={styles.input}
-                placeholder="Correo electrónico"
-                placeholderTextColor={theme.textLight}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
+            <Text style={styles.sectionTitle}>Datos principales</Text>
 
-            <View style={styles.inputRow}>
-              <Ionicons name="lock-closed" size={24} color={theme.primary} />
-              <TextInput
-                style={styles.input}
-                placeholder="Contraseña"
-                placeholderTextColor={theme.textLight}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity onPress={() => setShowPassword((s) => !s)}>
-                <Ionicons
-                  name={showPassword ? "eye-outline" : "eye-off-outline"}
-                  size={22}
-                  color={theme.textLight}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Correo electrónico</Text>
+              <View style={styles.inputRow}>
+                <Ionicons name="mail" size={22} color={theme.primary} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="ejemplo@correo.com"
+                  placeholderTextColor={theme.textLight}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
                 />
-              </TouchableOpacity>
+              </View>
             </View>
 
-            <View style={styles.captchaCard}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Contraseña</Text>
+              <View style={styles.inputRow}>
+                <Ionicons name="lock-closed" size={22} color={theme.primary} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Mínimo 6 caracteres"
+                  placeholderTextColor={theme.textLight}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity onPress={() => setShowPassword((s) => !s)}>
+                  <Ionicons
+                    name={showPassword ? "eye-outline" : "eye-off-outline"}
+                    size={22}
+                    color={theme.textLight}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={[styles.cardSection, captchaToken && styles.cardSectionSuccess]}>
               <View style={styles.captchaTextContainer}>
                 <Text style={styles.captchaTitle}>Protección reCAPTCHA</Text>
                 <Text style={styles.captchaSubtitle}>
                   {captchaToken
-                    ? "Verificación completada"
-                    : "Pulsa el botón para validar que no eres un robot"}
+                    ? "Listo, confirmamos que no eres un robot"
+                    : "Verifica tu identidad para finalizar el registro"}
                 </Text>
               </View>
               <TouchableOpacity
@@ -143,7 +174,7 @@ const SignUpScreen = () => {
               activeOpacity={0.9}
             >
               <LinearGradient
-                colors={gradientColors}
+                colors={gradientColors.slice().reverse()}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.submitGradient}
@@ -151,7 +182,10 @@ const SignUpScreen = () => {
                 {loading ? (
                   <ActivityIndicator color={theme.white} />
                 ) : (
-                  <Text style={styles.submitText}>Crear cuenta</Text>
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color={theme.white} />
+                    <Text style={styles.submitText}>Crear cuenta</Text>
+                  </>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -167,11 +201,12 @@ const SignUpScreen = () => {
       </KeyboardAvoidingView>
       <RecaptchaModal
         ref={recaptchaRef}
+        siteKey={siteKey}
+        siteDomain={domain}
+        language={language}
         onVerify={handleRecaptchaVerify}
         onExpire={handleRecaptchaExpire}
-        onError={() =>
-          Alert.alert("Error", "No pudimos cargar el reCAPTCHA. Por favor, inténtalo de nuevo")
-        }
+        onError={handleRecaptchaError}
       />
     </LinearGradient>
   );
@@ -181,6 +216,25 @@ const createStyles = (theme) =>
   StyleSheet.create({
     gradient: {
       flex: 1,
+      position: "relative",
+    },
+    decorativeBlob: {
+      position: "absolute",
+      top: -120,
+      left: -80,
+      width: 260,
+      height: 260,
+      borderRadius: 130,
+      backgroundColor: "rgba(255,255,255,0.18)",
+    },
+    decorativeAccent: {
+      position: "absolute",
+      right: -70,
+      bottom: -90,
+      width: 220,
+      height: 220,
+      borderRadius: 130,
+      backgroundColor: "rgba(0,0,0,0.1)",
     },
     flex: {
       flex: 1,
@@ -188,81 +242,123 @@ const createStyles = (theme) =>
     scrollContent: {
       flexGrow: 1,
       justifyContent: "center",
-      padding: 20,
+      paddingHorizontal: 26,
+      paddingVertical: 42,
     },
-    logoContainer: {
-      alignItems: "center",
+    heroContainer: {
       marginBottom: 30,
     },
-    logoTitle: {
-      fontSize: responsiveFontSize(30),
-      fontWeight: "900",
-      color: theme.white,
-      marginTop: 12,
+    heroBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-start",
+      gap: 10,
+      backgroundColor: theme.white,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 999,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    heroBadgeText: {
+      color: theme.primary,
+      fontWeight: "800",
+      fontSize: responsiveFontSize(12),
       textTransform: "uppercase",
       letterSpacing: 1,
     },
-    logoSubtitle: {
-      color: "#E9ECEF",
-      marginTop: 6,
-      fontSize: responsiveFontSize(15),
+    heroTitle: {
+      fontSize: responsiveFontSize(30),
+      fontWeight: "800",
+      color: theme.white,
+      marginTop: 18,
+      letterSpacing: 0.6,
+    },
+    heroSubtitle: {
+      marginTop: 10,
+      color: "rgba(255,255,255,0.85)",
+      fontSize: responsiveFontSize(14),
+      lineHeight: responsiveFontSize(21),
+      maxWidth: 320,
     },
     formCard: {
       backgroundColor: theme.card,
-      borderRadius: 20,
-      padding: 24,
+      borderRadius: 26,
+      padding: 26,
+      gap: 20,
       shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.15,
-      shadowRadius: 10,
-      elevation: 5,
-      gap: 18,
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.12,
+      shadowRadius: 24,
+      elevation: 10,
+    },
+    sectionTitle: {
+      fontSize: responsiveFontSize(18),
+      fontWeight: "700",
+      color: theme.text,
+    },
+    inputGroup: {
+      gap: 8,
+    },
+    inputLabel: {
+      fontSize: responsiveFontSize(12),
+      fontWeight: "700",
+      textTransform: "uppercase",
+      color: theme.textLight,
+      letterSpacing: 0.8,
     },
     inputRow: {
       flexDirection: "row",
       alignItems: "center",
-      borderWidth: 2,
+      borderWidth: 1,
       borderColor: theme.border,
-      borderRadius: 10,
-      paddingHorizontal: 12,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
       backgroundColor: theme.surface,
-      gap: 10,
+      gap: 12,
     },
     input: {
       flex: 1,
-      paddingVertical: 12,
       color: theme.text,
       fontSize: responsiveFontSize(14),
     },
-    captchaCard: {
-      borderWidth: 2,
-      borderColor: theme.border,
-      borderRadius: 10,
-      padding: 16,
-      backgroundColor: theme.surface,
+    cardSection: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 12,
+      gap: 16,
+      padding: 18,
+      borderRadius: 18,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    cardSectionSuccess: {
+      borderColor: theme.success,
+      backgroundColor: `${theme.success}1A`,
     },
     captchaTextContainer: {
       flex: 1,
-      marginRight: 12,
       gap: 6,
     },
     captchaTitle: {
       color: theme.text,
-      fontWeight: "600",
+      fontWeight: "700",
       fontSize: responsiveFontSize(13),
     },
     captchaSubtitle: {
       color: theme.textLight,
       fontSize: responsiveFontSize(12),
+      lineHeight: responsiveFontSize(18),
     },
     captchaButton: {
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderRadius: 8,
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      borderRadius: 12,
       backgroundColor: theme.primary,
     },
     captchaButtonVerified: {
@@ -273,29 +369,33 @@ const createStyles = (theme) =>
       fontWeight: "700",
       fontSize: responsiveFontSize(12),
       textTransform: "uppercase",
+      letterSpacing: 0.8,
     },
     submitButton: {
-      borderRadius: 10,
+      borderRadius: 16,
       overflow: "hidden",
     },
     submitGradient: {
       paddingVertical: 14,
       alignItems: "center",
       justifyContent: "center",
+      flexDirection: "row",
+      gap: 10,
     },
     submitText: {
       color: theme.white,
-      fontSize: responsiveFontSize(16),
+      fontSize: responsiveFontSize(15),
       fontWeight: "700",
       textTransform: "uppercase",
+      letterSpacing: 0.8,
     },
     loginLink: {
-      marginTop: 14,
       alignItems: "center",
     },
     loginText: {
-      color: theme.text,
+      color: theme.textLight,
       fontSize: responsiveFontSize(13),
+      marginTop: 8,
     },
     loginTextHighlight: {
       color: theme.primary,
