@@ -1,0 +1,114 @@
+[
+  {
+    "id": "p1",
+    "title": "Filtro de Aceite OF-1234",
+    "category": "Filtros",
+    "image": "https://picsum.photos/seed/oilfilter/800/600",
+    "cookTime": "Q9.99",
+    "servings": "Stock: 35",
+    "area": "Bosch",
+    "ingredients": [
+      "Rosca: M20x1.5",
+      "Altura: 85 mm",
+      "Diámetro: 65 mm",
+      "Compatibilidad 1.6–2.0L"
+    ],
+    "instructions": [
+      "Toyota Corolla 2014–2018",
+      "Honda Civic 2013–2015"
+    ]
+  },
+  {
+    "id": "p2",
+    "title": "Pastillas de Freno Delanteras BP-5678",
+    "category": "Frenos",
+    "image": "https://picsum.photos/seed/brakepads/800/600",
+    "cookTime": "Q49.90",
+    "servings": "Stock: 12",
+    "area": "Brembo",
+    "ingredients": [
+      "Material: Cerámico",
+      "Posición: Delantera",
+      "Incluye sensores: No"
+    ],
+    "instructions": [
+      "VW Jetta 2017–2020",
+      "Audi A3 2016–2018 (verificar medida)"
+    ]
+  },
+  {
+    "id": "p3",
+    "title": "Batería 12V 60Ah AGM",
+    "category": "Eléctrico",
+    "image": "https://picsum.photos/seed/battery/800/600",
+    "cookTime": "Q129.00",
+    "servings": "Stock: 20",
+    "area": "Varta",
+    "ingredients": [
+      "Tipo: AGM",
+      "Capacidad: 60 Ah",
+      "CCA: 600 A",
+      "Garantía: 18 meses"
+    ],
+    "instructions": [
+      "Compatibilidad universal segmento compacto",
+      "Revisar tamaño de bandeja y bornes"
+    ]
+  },
+  {
+    "id": "p4",
+    "title": "Filtro de Aire AF-2210",
+    "category": "Filtros",
+    "image": "https://picsum.photos/seed/airfilter/800/600",
+    "cookTime": "Q14.50",
+    "servings": "Stock: 40",
+    "area": "Mann",
+    "ingredients": [
+      "Tipo: Panel",
+      "Largo: 300 mm",
+      "Ancho: 180 mm",
+      "Alto: 45 mm"
+    ],
+    "instructions": [
+      "Nissan Sentra 2017–2022",
+      "Kia Rio 2018–2021 (verificar motor)"
+    ]
+  },
+  {
+    "id": "p5",
+    "title": "Amortiguador Trasero G-Plus",
+    "category": "Suspensión",
+    "image": "https://picsum.photos/seed/shock/800/600",
+    "cookTime": "Q79.00",
+    "servings": "Stock: 10",
+    "area": "KYB",
+    "ingredients": [
+      "Gas presurizado",
+      "Cuerpo reforzado",
+      "Incluye bujes"
+    ],
+    "instructions": [
+      "Toyota Hilux 2016–2023",
+      "Cargar par de ambos lados"
+    ]
+  },
+  {
+    "id": "p6",
+    "title": "Bujías Iridium IX 14mm (x4)",
+    "category": "Encendido",
+    "image": "https://picsum.photos/seed/sparkplugs/800/600",
+    "cookTime": "Q36.90",
+    "servings": "Stock: 28",
+    "area": "NGK",
+    "ingredients": [
+      "Rosca: M14 x 1.25",
+      "Separación: 0.8 mm",
+      "Grado térmico: 6"
+    ],
+    "instructions": [
+      "Honda Fit 2009–2014",
+      "Chevrolet Aveo 2008–2012",
+      "Aplicar torque según manual"
+    ]
+  }
+]
