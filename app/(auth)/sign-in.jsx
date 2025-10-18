@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -31,22 +31,46 @@ const SignInScreen = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [captchaQuestion, setCaptchaQuestion] = useState("");
+  const [captchaAnswer, setCaptchaAnswer] = useState("");
+  const [captchaInput, setCaptchaInput] = useState("");
 
-const handleSignIn = async () => {
-  if (!email.trim() || !password.trim()) {
-    Alert.alert("Campos requeridos", "Por favor completa email y contraseña");
-    return;
-  }
-  try {
-    setLoading(true);
-    await strapiSignIn(email, password);  // email va en "identifier"
-    router.replace("/(tabs)");
-  } catch (e) {
-    Alert.alert("No pudimos iniciar sesión", e.friendlyMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+  const generateCaptcha = () => {
+    const a = Math.floor(Math.random() * 9) + 1;
+    const b = Math.floor(Math.random() * 9) + 1;
+    setCaptchaQuestion(`¿Cuánto es ${a} + ${b}?`);
+    setCaptchaAnswer(String(a + b));
+    setCaptchaInput("");
+  };
+
+  useEffect(() => {
+    generateCaptcha();
+  }, []);
+
+  const handleSignIn = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert("Campos requeridos", "Por favor completa email y contraseña");
+      return;
+    }
+    if (!captchaInput.trim()) {
+      Alert.alert("Verificación", "Resuelve el captcha para continuar");
+      return;
+    }
+    if (captchaInput.trim() !== captchaAnswer) {
+      Alert.alert("Captcha incorrecto", "Inténtalo nuevamente");
+      generateCaptcha();
+      return;
+    }
+    try {
+      setLoading(true);
+      await strapiSignIn(email, password); // email va en "identifier"
+      router.replace("/(tabs)");
+    } catch (e) {
+      Alert.alert("No pudimos iniciar sesión", e.friendlyMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <LinearGradient
@@ -165,6 +189,62 @@ const handleSignIn = async () => {
                   color={COLORS.textLight}
                 />
               </TouchableOpacity>
+            </View>
+
+            {/* Captcha */}
+            <View
+              style={{
+                borderWidth: 2,
+                borderColor: "#dee2e6",
+                borderRadius: 10,
+                marginBottom: 18,
+                padding: 12,
+                backgroundColor: COLORS.background,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    color: COLORS.text,
+                    fontWeight: "600",
+                    fontSize: 14,
+                  }}
+                >
+                  {captchaQuestion}
+                </Text>
+                <TouchableOpacity onPress={generateCaptcha}>
+                  <Ionicons name="refresh" size={20} color={COLORS.primary} />
+                </TouchableOpacity>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <Ionicons name="shield-checkmark" size={22} color={COLORS.primary} />
+                <TextInput
+                  style={{
+                    flex: 1,
+                    marginLeft: 10,
+                    paddingVertical: 8,
+                    color: COLORS.text,
+                    fontSize: 15,
+                  }}
+                  placeholder="Escribe el resultado"
+                  placeholderTextColor={COLORS.textLight}
+                  keyboardType="number-pad"
+                  value={captchaInput}
+                  onChangeText={setCaptchaInput}
+                />
+              </View>
             </View>
 
             {/* Botón login estilo Bootstrap */}
