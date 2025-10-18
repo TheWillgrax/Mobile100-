@@ -3,6 +3,8 @@ import { ActivityIndicator, Modal, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 const DEFAULT_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
+const DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
 const buildHtml = (siteKey) => `<!DOCTYPE html>
 <html lang="es">
@@ -26,12 +28,16 @@ const buildHtml = (siteKey) => `<!DOCTYPE html>
         justify-content: center;
       }
     </style>
-    <script src="https://www.google.com/recaptcha/api.js?hl=es" async defer></script>
+    <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit&hl=es" async defer></script>
     <script>
       const sendMessage = (payload) => {
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify(payload));
         }
+      };
+
+      window.onRecaptchaLoad = function () {
+        sendMessage({ type: "loaded" });
       };
 
       window.onCaptchaSuccess = function (token) {
@@ -46,23 +52,25 @@ const buildHtml = (siteKey) => `<!DOCTYPE html>
         sendMessage({ type: "error" });
       };
 
-      document.addEventListener("DOMContentLoaded", function () {
-        const renderCaptcha = () => {
-          if (!window.grecaptcha) {
-            setTimeout(renderCaptcha, 300);
-            return;
-          }
+      const renderCaptcha = () => {
+        if (!window.grecaptcha || !window.grecaptcha.render) {
+          setTimeout(renderCaptcha, 300);
+          return;
+        }
 
+        try {
           window.grecaptcha.render("captcha-container", {
             sitekey: "${siteKey}",
-            callback: "onCaptchaSuccess",
-            "expired-callback": "onCaptchaExpired",
-            "error-callback": "onCaptchaError",
+            callback: onCaptchaSuccess,
+            "expired-callback": onCaptchaExpired,
+            "error-callback": onCaptchaError,
           });
-        };
+        } catch (error) {
+          sendMessage({ type: "error", message: error?.message });
+        }
+      };
 
-        renderCaptcha();
-      });
+      document.addEventListener("DOMContentLoaded", renderCaptcha);
     </script>
   </head>
   <body>
@@ -98,7 +106,9 @@ const RecaptchaModal = forwardRef(({ siteKey = DEFAULT_SITE_KEY, onVerify, onExp
     (event) => {
       try {
         const data = JSON.parse(event?.nativeEvent?.data ?? "{}");
-        if (data.type === "success" && data.token) {
+        if (data.type === "loaded") {
+          setLoading(false);
+        } else if (data.type === "success" && data.token) {
           onVerify?.(data.token);
           close();
         } else if (data.type === "expired") {
@@ -110,7 +120,7 @@ const RecaptchaModal = forwardRef(({ siteKey = DEFAULT_SITE_KEY, onVerify, onExp
         onError?.();
       }
     },
-    [close, onError, onExpire, onVerify]
+    [close, onError, onExpire, onVerify, setLoading]
   );
 
   return (
@@ -128,6 +138,11 @@ const RecaptchaModal = forwardRef(({ siteKey = DEFAULT_SITE_KEY, onVerify, onExp
             onLoadEnd={() => setLoading(false)}
             onMessage={handleMessage}
             style={styles.webview}
+            userAgent={DEFAULT_USER_AGENT}
+            javaScriptEnabled
+            domStorageEnabled
+            setSupportMultipleWindows={false}
+            mixedContentMode="always"
           />
         </View>
       </View>
