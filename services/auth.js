@@ -6,9 +6,10 @@ import { storage } from "./storage";
 export async function signIn(identifier, password) {
   const { data } = await api.post("/auth/new-local", { identifier, password });
   await storage.set("token", data.jwt);
-  return data.user;
+  await storage.set("user", JSON.stringify(data.user));
+  return data;
 }
 
 export async function signOut() {
-  await storage.del("token");
+  await Promise.all([storage.del("token"), storage.del("user")]);
 }

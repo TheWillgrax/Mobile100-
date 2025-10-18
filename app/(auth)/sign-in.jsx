@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 
-import { signIn as strapiSignIn } from "../../services/auth";
+import { useAuth } from "../../hooks/auth";
 
 const COLORS = {
   primary: "#0d6efd",   // azul bootstrap
@@ -26,6 +26,7 @@ const COLORS = {
 
 const SignInScreen = () => {
   const router = useRouter();
+  const { signIn: authenticate } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,7 +64,7 @@ const SignInScreen = () => {
     }
     try {
       setLoading(true);
-      await strapiSignIn(email, password); // email va en "identifier"
+      await authenticate(email, password); // email va en "identifier"
       router.replace("/(tabs)");
     } catch (e) {
       Alert.alert("No pudimos iniciar sesión", e.friendlyMessage);
