@@ -5,11 +5,25 @@ import { WebView } from "react-native-webview";
 import { useTheme } from "../hooks/theme";
 
 const DEFAULT_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
+const DEFAULT_DOMAIN = "https://autoparts-app.mobile";
+const DEFAULT_LANGUAGE = "es";
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
-const buildHtml = (siteKey) => `<!DOCTYPE html>
-<html lang="es">
+const sanitizeDomain = (domain) => {
+  if (typeof domain !== "string") return DEFAULT_DOMAIN;
+  try {
+    const trimmed = domain.trim();
+    if (!trimmed) return DEFAULT_DOMAIN;
+    const url = trimmed.startsWith("http") ? new URL(trimmed) : new URL(`https://${trimmed}`);
+    return `${url.origin}${url.pathname === "/" ? "" : url.pathname}`;
+  } catch (_error) {
+    return DEFAULT_DOMAIN;
+  }
+};
+
+const buildHtml = (siteKey, siteDomain, language) => `<!DOCTYPE html>
+<html lang="${language}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -30,7 +44,20 @@ const buildHtml = (siteKey) => `<!DOCTYPE html>
         justify-content: center;
       }
     </style>
-    <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit&hl=es" async defer></script>
+    <script>
+      (function enforceDomain() {
+        try {
+          var desired = "${siteDomain}";
+          if (desired) {
+            var normalized = desired.startsWith("http") ? desired : "https://" + desired;
+            history.replaceState({}, "", normalized);
+          }
+        } catch (error) {
+          console.warn("recaptcha domain warning", error);
+        }
+      })();
+    </script>
+    <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit&hl=${language}" async defer></script>
     <script>
       const sendMessage = (payload) => {
         if (window.ReactNativeWebView) {
@@ -55,7 +82,7 @@ const buildHtml = (siteKey) => `<!DOCTYPE html>
             "error-callback": onCaptchaError,
           });
         } catch (error) {
-          sendMessage({ type: "error", message: error?.message });
+          sendMessage({ type: "error", message: error?.message || "render" });
         }
       };
 
@@ -73,8 +100,12 @@ const buildHtml = (siteKey) => `<!DOCTYPE html>
         renderCaptcha();
       };
 
-      window.onCaptchaError = function () {
-        sendMessage({ type: "error" });
+      window.onCaptchaError = function (error) {
+        const message =
+          (typeof error === "string" && error) ||
+          (error && error.message) ||
+          "No se pudo inicializar el reCAPTCHA";
+        sendMessage({ type: "error", message });
         renderCaptcha();
       };
 
@@ -126,82 +157,98 @@ const createStyles = (theme) =>
     },
   });
 
-const RecaptchaModal = forwardRef(({ siteKey = DEFAULT_SITE_KEY, onVerify, onExpire, onError }, ref) => {
-  const { theme } = useTheme();
-  const [visible, setVisible] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [webviewKey, setWebviewKey] = useState(0);
+const RecaptchaModal = forwardRef(
+  (
+    {
+      siteKey = DEFAULT_SITE_KEY,
+      siteDomain = DEFAULT_DOMAIN,
+      language = DEFAULT_LANGUAGE,
+      onVerify,
+      onExpire,
+      onError,
+    },
+    ref
+  ) => {
+    const { theme } = useTheme();
+    const [visible, setVisible] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [webviewKey, setWebviewKey] = useState(0);
 
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const html = useMemo(() => buildHtml(siteKey), [siteKey]);
+    const styles = useMemo(() => createStyles(theme), [theme]);
+    const sanitizedDomain = useMemo(() => sanitizeDomain(siteDomain), [siteDomain]);
+    const html = useMemo(
+      () => buildHtml(siteKey, sanitizedDomain, language),
+      [language, sanitizedDomain, siteKey]
+    );
 
-  const open = useCallback(() => {
-    setWebviewKey((key) => key + 1);
-    setVisible(true);
-    setLoading(true);
-  }, []);
+    const open = useCallback(() => {
+      setWebviewKey((key) => key + 1);
+      setVisible(true);
+      setLoading(true);
+    }, []);
 
-  const close = useCallback(() => {
-    setVisible(false);
-  }, []);
+    const close = useCallback(() => {
+      setVisible(false);
+    }, []);
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      open,
-      close,
-    }),
-    [open, close]
-  );
+    useImperativeHandle(
+      ref,
+      () => ({
+        open,
+        close,
+      }),
+      [open, close]
+    );
 
-  const handleMessage = useCallback(
-    (event) => {
-      try {
-        const data = JSON.parse(event?.nativeEvent?.data ?? "{}");
-        if (data.type === "loaded") {
-          setLoading(false);
-        } else if (data.type === "success" && data.token) {
-          onVerify?.(data.token);
-          close();
-        } else if (data.type === "expired") {
-          onExpire?.();
-        } else if (data.type === "error") {
+    const handleMessage = useCallback(
+      (event) => {
+        try {
+          const data = JSON.parse(event?.nativeEvent?.data ?? "{}");
+          if (data.type === "loaded") {
+            setLoading(false);
+          } else if (data.type === "success" && data.token) {
+            onVerify?.(data.token);
+            close();
+          } else if (data.type === "expired") {
+            onExpire?.();
+          } else if (data.type === "error") {
+            onError?.(data.message);
+          }
+        } catch (_error) {
           onError?.();
         }
-      } catch (_error) {
-        onError?.();
-      }
-    },
-    [close, onError, onExpire, onVerify]
-  );
+      },
+      [close, onError, onExpire, onVerify]
+    );
 
-  return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={close}>
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          {loading && (
-            <View style={styles.loader}>
-              <ActivityIndicator size="large" color={theme.primary} />
-            </View>
-          )}
-          <WebView
-            key={webviewKey}
-            originWhitelist={["*"]}
-            source={{ html }}
-            onLoadEnd={() => setLoading(false)}
-            onMessage={handleMessage}
-            style={styles.webview}
-            userAgent={DEFAULT_USER_AGENT}
-            javaScriptEnabled
-            domStorageEnabled
-            setSupportMultipleWindows={false}
-            mixedContentMode="always"
-          />
+    return (
+      <Modal transparent animationType="fade" visible={visible} onRequestClose={close}>
+        <View style={styles.overlay}>
+          <View style={styles.card}>
+            {loading && (
+              <View style={styles.loader}>
+                <ActivityIndicator size="large" color={theme.primary} />
+              </View>
+            )}
+            <WebView
+              key={webviewKey}
+              originWhitelist={["*"]}
+              source={{ html }}
+              onLoadEnd={() => setLoading(false)}
+              onMessage={handleMessage}
+              style={styles.webview}
+              userAgent={DEFAULT_USER_AGENT}
+              javaScriptEnabled
+              domStorageEnabled
+              setSupportMultipleWindows={false}
+              mixedContentMode="always"
+            />
+          </View>
         </View>
-      </View>
-    </Modal>
-  );
-});
+      </Modal>
+    );
+  }
+);
 
 RecaptchaModal.displayName = "RecaptchaModal";
 
