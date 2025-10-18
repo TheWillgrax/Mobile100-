@@ -7,10 +7,12 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import RecipeCard from "../../components/RecipeCard";
 import { COLORS } from "../../constants/colors";
 import { useDebounce } from "../../hooks/useDebounce";
+import { useAuth } from "../../hooks/auth";
 import { MealAPI } from "../../services/mealAPI";
 
 const SearchScreen = () => {
   const router = useRouter();
+  const { isAuthenticated, signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -103,7 +105,14 @@ const SearchScreen = () => {
 
           {/* Botón Cerrar sesión */}
           <TouchableOpacity
-            onPress={() => router.replace("/(auth)/sign-in")}
+            onPress={async () => {
+              if (isAuthenticated) {
+                await signOut();
+                router.replace("/(auth)/sign-in");
+              } else {
+                router.push("/(auth)/sign-in");
+              }
+            }}
             style={{
               position: "absolute",
               top: 0,
@@ -114,7 +123,11 @@ const SearchScreen = () => {
               alignItems: "center",
             }}
           >
-            <Ionicons name="log-out-outline" size={28} color={COLORS.primary} />
+            <Ionicons
+              name={isAuthenticated ? "log-out-outline" : "log-in-outline"}
+              size={28}
+              color={COLORS.primary}
+            />
           </TouchableOpacity>
         </View>
       </View>

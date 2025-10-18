@@ -2,7 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlatList, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { homeStyles } from "../../assets/styles/home.styles";
 import CategoryFilter from "../../components/CategoryFilter";
@@ -10,12 +10,14 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import RecipeCard from "../../components/RecipeCard";
 import SafeScreen from "../../components/SafeScreen";
 import { COLORS } from "../../constants/colors";
+import { useAuth } from "../../hooks/auth";
 import { MealAPI } from "../../services/mealAPI";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const HomeScreen = () => {
   const router = useRouter();
+  const { session, signOut, isAuthenticated } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [recipes, setRecipes] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -87,6 +89,27 @@ const HomeScreen = () => {
     loadData();
   }, []);
 
+  const displayName = useMemo(() => {
+    if (!session?.user) return "Usuario";
+
+    return (
+      session.user.name ||
+      session.user.username ||
+      session.user.fullName ||
+      session.user.email ||
+      "Usuario"
+    );
+  }, [session]);
+
+  const handleAuthPress = async () => {
+    if (isAuthenticated) {
+      await signOut();
+      router.replace("/(auth)/sign-in");
+    } else {
+      router.push("/(auth)/sign-in");
+    }
+  };
+
   if (loading && !refreshing) return <LoadingSpinner message="Loading delicious recipes..." />;
 
   return (
@@ -105,18 +128,25 @@ const HomeScreen = () => {
         {/* CONTENIDO ORIGINAL SIN PROVEEDORES CERCANOS */}
         <View style={homeStyles.welcomeSection}>
           <View style={homeStyles.welcomeTextContainer}>
-            <Text style={homeStyles.welcomeText}>Bienvenido</Text>
+            <Text style={homeStyles.welcomeText}>
+              {isAuthenticated ? `Hola, ${displayName}` : "Bienvenido"}
+            </Text>
             <Text style={homeStyles.welcomeSubtitle}>
-              Estás explorando como invitado
+              {isAuthenticated
+                ? "¡Nos alegra verte de nuevo!"
+                : "Estás explorando como invitado"}
             </Text>
           </View>
 
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/sign-in")}
-            style={homeStyles.signInButton}
-          >
-            <Ionicons name="log-in-outline" size={20} color={COLORS.white} />
-            <Text style={homeStyles.signInButtonText}>Iniciar sesión</Text>
+          <TouchableOpacity onPress={handleAuthPress} style={homeStyles.signInButton}>
+            <Ionicons
+              name={isAuthenticated ? "log-out-outline" : "log-in-outline"}
+              size={20}
+              color={COLORS.white}
+            />
+            <Text style={homeStyles.signInButtonText}>
+              {isAuthenticated ? "Cerrar sesión" : "Iniciar sesión"}
+            </Text>
           </TouchableOpacity>
         </View>
 

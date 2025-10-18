@@ -1,6 +1,6 @@
-import * as SecureStore from "expo-secure-store";
-import { createContext, useContext, useEffect, useState } from "react";
-import { api } from "../services/api";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { signIn as signInRequest, signOut as signOutRequest } from "../services/auth";
+import { storage } from "../services/storage";
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -10,33 +10,55 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     (async () => {
-      const token = await SecureStore.getItemAsync("token");
-      const userStr = await SecureStore.getItemAsync("user");
-      if (token && userStr) setSession({ token, user: JSON.parse(userStr) });
-      setLoading(false);
+      try {
+        const [token, storedUser] = await Promise.all([
+          storage.get("token"),
+          storage.get("user"),
+        ]);
+
+        if (!isMounted) return;
+
+        if (token && storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            setSession({ token, user: parsedUser });
+          } catch {
+            setSession({ token, user: null });
+          }
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     })();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const signIn = async (identifier, password) => {
-    // Tu endpoint custom de Strapi:
-    const { data } = await api.post("/auth/new-local", { identifier, password });
-    // Si usas el estándar de Strapi, cambia a: /auth/local
-    const { jwt, user } = data;
-    await SecureStore.setItemAsync("token", jwt);
-    await SecureStore.setItemAsync("user", JSON.stringify(user));
+    const { jwt, user } = await signInRequest(identifier, password);
     setSession({ token: jwt, user });
   };
 
   const signOut = async () => {
-    await SecureStore.deleteItemAsync("token");
-    await SecureStore.deleteItemAsync("user");
+    await signOutRequest();
     setSession(null);
   };
 
-  return (
-    <AuthContext.Provider value={{ session, loading, signIn, signOut }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      session,
+      loading,
+      signIn,
+      signOut,
+      isAuthenticated: Boolean(session?.token),
+    }),
+    [loading, session]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
