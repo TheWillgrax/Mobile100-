@@ -1,5 +1,11 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { signIn as signInRequest, signOut as signOutRequest } from "../services/auth";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+
+import {
+  changePassword as changePasswordRequest,
+  signIn as signInRequest,
+  signOut as signOutRequest,
+  updateProfile as updateProfileRequest,
+} from "../services/auth";
 import { storage } from "../services/storage";
 
 const AuthContext = createContext(null);
@@ -39,15 +45,24 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const signIn = async (identifier, password) => {
+  const signIn = useCallback(async (identifier, password) => {
     const { jwt, user } = await signInRequest(identifier, password);
     setSession({ token: jwt, user });
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await signOutRequest();
     setSession(null);
-  };
+  }, []);
+
+  const updateProfile = useCallback(async (updates = {}) => {
+    const user = await updateProfileRequest(updates);
+    setSession((current) => (current ? { ...current, user } : current));
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword, password, passwordConfirmation) => {
+    await changePasswordRequest(currentPassword, password, passwordConfirmation);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -55,9 +70,11 @@ export function AuthProvider({ children }) {
       loading,
       signIn,
       signOut,
+      updateProfile,
+      changePassword,
       isAuthenticated: Boolean(session?.token),
     }),
-    [loading, session]
+    [changePassword, loading, session, signIn, signOut, updateProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

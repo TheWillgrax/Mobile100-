@@ -1,30 +1,29 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import RecaptchaModal from "../../components/RecaptchaModal";
 
-const COLORS = {
-  primary: "#0d6efd",   // estilo bootstrap primary
-  secondary: "#6610f2", // morado acento
-  background: "#f8f9fa",
-  text: "#212529",
-  textLight: "#6c757d",
-};
+import RecaptchaModal from "../../components/RecaptchaModal";
+import { useTheme } from "../../hooks/theme";
+import { responsiveFontSize } from "../../utils/responsive";
 
 const SignUpScreen = () => {
   const router = useRouter();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -39,10 +38,7 @@ const SignUpScreen = () => {
 
   const handleRecaptchaExpire = () => {
     setCaptchaToken(null);
-    Alert.alert(
-      "Verificación requerida",
-      "El reCAPTCHA ha expirado, inténtalo nuevamente"
-    );
+    Alert.alert("Verificación requerida", "El reCAPTCHA ha expirado, inténtalo nuevamente");
   };
 
   const handleSignUp = () => {
@@ -68,85 +64,32 @@ const SignUpScreen = () => {
     }, 800);
   };
 
+  const gradientColors = [theme.primary, theme.secondary ?? theme.primary];
+
   return (
-    <LinearGradient
-      colors={[COLORS.primary, COLORS.secondary]}
-      style={{ flex: 1 }}
-    >
+    <LinearGradient colors={gradientColors} style={styles.gradient}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
-        style={{ flex: 1 }}
+        style={styles.flex}
       >
         <ScrollView
-          contentContainerStyle={{
-            flexGrow: 1,
-            justifyContent: "center",
-            padding: 20,
-          }}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Logo y título */}
-          <View style={{ alignItems: "center", marginBottom: 30 }}>
-            <Ionicons name="car-sport" size={100} color="#fff" />
-            <Text
-              style={{
-                fontSize: 32,
-                fontWeight: "900",
-                color: "#fff",
-                marginTop: 12,
-                textTransform: "uppercase",
-                letterSpacing: 1,
-              }}
-            >
-              AutoParts
-            </Text>
-            <Text style={{ color: "#E9ECEF", marginTop: 6, fontSize: 16 }}>
-              Crea tu cuenta fácilmente
-            </Text>
+          <View style={styles.logoContainer}>
+            <Ionicons name="car-sport" size={100} color={theme.white} />
+            <Text style={styles.logoTitle}>AutoParts</Text>
+            <Text style={styles.logoSubtitle}>Crea tu cuenta fácilmente</Text>
           </View>
 
-          {/* Card del formulario */}
-          <View
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: 20,
-              padding: 24,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.15,
-              shadowRadius: 10,
-              elevation: 5,
-            }}
-          >
-            {/* Email */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                borderWidth: 2,
-                borderColor: "#dee2e6",
-                borderRadius: 10,
-                marginBottom: 18,
-                paddingHorizontal: 12,
-                backgroundColor: COLORS.background,
-              }}
-            >
-              <Ionicons
-                name="mail"
-                size={24}
-                color={COLORS.primary}
-              />
+          <View style={styles.formCard}>
+            <View style={styles.inputRow}>
+              <Ionicons name="mail" size={24} color={theme.primary} />
               <TextInput
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  marginLeft: 10,
-                  color: COLORS.text,
-                  fontSize: 15,
-                }}
+                style={styles.input}
                 placeholder="Correo electrónico"
-                placeholderTextColor={COLORS.textLight}
+                placeholderTextColor={theme.textLight}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -154,154 +97,69 @@ const SignUpScreen = () => {
               />
             </View>
 
-            {/* Password */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                borderWidth: 2,
-                borderColor: "#dee2e6",
-                borderRadius: 10,
-                marginBottom: 18,
-                paddingHorizontal: 12,
-                backgroundColor: COLORS.background,
-              }}
-            >
-              <Ionicons
-                name="lock-closed"
-                size={24}
-                color={COLORS.primary}
-              />
+            <View style={styles.inputRow}>
+              <Ionicons name="lock-closed" size={24} color={theme.primary} />
               <TextInput
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  marginLeft: 10,
-                  color: COLORS.text,
-                  fontSize: 15,
-                }}
+                style={styles.input}
                 placeholder="Contraseña"
-                placeholderTextColor={COLORS.textLight}
+                placeholderTextColor={theme.textLight}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <TouchableOpacity onPress={() => setShowPassword((s) => !s)}>
                 <Ionicons
                   name={showPassword ? "eye-outline" : "eye-off-outline"}
                   size={22}
-                  color={COLORS.textLight}
+                  color={theme.textLight}
                 />
               </TouchableOpacity>
             </View>
 
-            {/* Captcha */}
-            <View
-              style={{
-                borderWidth: 2,
-                borderColor: "#dee2e6",
-                borderRadius: 10,
-                marginBottom: 18,
-                padding: 16,
-                backgroundColor: COLORS.background,
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text
-                    style={{
-                      color: COLORS.text,
-                      fontWeight: "600",
-                      fontSize: 14,
-                      marginBottom: 6,
-                    }}
-                  >
-                    Protección reCAPTCHA
-                  </Text>
-                  <Text style={{ color: COLORS.textLight, fontSize: 13 }}>
-                    {captchaToken
-                      ? "Verificación completada"
-                      : "Pulsa el botón para validar que no eres un robot"}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => recaptchaRef.current?.open()}
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 8,
-                    backgroundColor: captchaToken ? "#198754" : COLORS.primary,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#fff",
-                      fontWeight: "700",
-                      fontSize: 13,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {captchaToken ? "Verificado" : "Verificar"}
-                  </Text>
-                </TouchableOpacity>
+            <View style={styles.captchaCard}>
+              <View style={styles.captchaTextContainer}>
+                <Text style={styles.captchaTitle}>Protección reCAPTCHA</Text>
+                <Text style={styles.captchaSubtitle}>
+                  {captchaToken
+                    ? "Verificación completada"
+                    : "Pulsa el botón para validar que no eres un robot"}
+                </Text>
               </View>
+              <TouchableOpacity
+                onPress={() => recaptchaRef.current?.open()}
+                style={[styles.captchaButton, captchaToken && styles.captchaButtonVerified]}
+              >
+                <Text style={styles.captchaButtonText}>
+                  {captchaToken ? "Verificado" : "Verificar"}
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Botón registro estilo Bootstrap */}
             <TouchableOpacity
               onPress={handleSignUp}
               disabled={loading}
-              style={{
-                borderRadius: 10,
-                overflow: "hidden",
-                marginBottom: 10,
-              }}
+              style={styles.submitButton}
               activeOpacity={0.9}
             >
               <LinearGradient
-                colors={[COLORS.secondary, COLORS.primary]}
+                colors={gradientColors}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={{
-                  paddingVertical: 14,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
+                style={styles.submitGradient}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={theme.white} />
                 ) : (
-                  <Text
-                    style={{
-                      color: "#fff",
-                      fontSize: 16,
-                      fontWeight: "700",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Crear cuenta
-                  </Text>
+                  <Text style={styles.submitText}>Crear cuenta</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Link login */}
-            <TouchableOpacity
-              style={{ marginTop: 14, alignItems: "center" }}
-              onPress={() => router.back()}
-            >
-              <Text style={{ color: COLORS.text }}>
-                ¿Ya tienes una cuenta?{" "}
-                <Text style={{ color: COLORS.primary, fontWeight: "700" }}>
-                  Inicia sesión
-                </Text>
+            <TouchableOpacity style={styles.loginLink} onPress={() => router.back()}>
+              <Text style={styles.loginText}>
+                ¿Ya tienes una cuenta? {" "}
+                <Text style={styles.loginTextHighlight}>Inicia sesión</Text>
               </Text>
             </TouchableOpacity>
           </View>
@@ -312,14 +170,137 @@ const SignUpScreen = () => {
         onVerify={handleRecaptchaVerify}
         onExpire={handleRecaptchaExpire}
         onError={() =>
-          Alert.alert(
-            "Error",
-            "No pudimos cargar el reCAPTCHA. Por favor, inténtalo de nuevo"
-          )
+          Alert.alert("Error", "No pudimos cargar el reCAPTCHA. Por favor, inténtalo de nuevo")
         }
       />
     </LinearGradient>
   );
 };
+
+const createStyles = (theme) =>
+  StyleSheet.create({
+    gradient: {
+      flex: 1,
+    },
+    flex: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: "center",
+      padding: 20,
+    },
+    logoContainer: {
+      alignItems: "center",
+      marginBottom: 30,
+    },
+    logoTitle: {
+      fontSize: responsiveFontSize(30),
+      fontWeight: "900",
+      color: theme.white,
+      marginTop: 12,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+    },
+    logoSubtitle: {
+      color: "#E9ECEF",
+      marginTop: 6,
+      fontSize: responsiveFontSize(15),
+    },
+    formCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 24,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 5,
+      gap: 18,
+    },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: theme.border,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      backgroundColor: theme.surface,
+      gap: 10,
+    },
+    input: {
+      flex: 1,
+      paddingVertical: 12,
+      color: theme.text,
+      fontSize: responsiveFontSize(14),
+    },
+    captchaCard: {
+      borderWidth: 2,
+      borderColor: theme.border,
+      borderRadius: 10,
+      padding: 16,
+      backgroundColor: theme.surface,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    captchaTextContainer: {
+      flex: 1,
+      marginRight: 12,
+      gap: 6,
+    },
+    captchaTitle: {
+      color: theme.text,
+      fontWeight: "600",
+      fontSize: responsiveFontSize(13),
+    },
+    captchaSubtitle: {
+      color: theme.textLight,
+      fontSize: responsiveFontSize(12),
+    },
+    captchaButton: {
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 8,
+      backgroundColor: theme.primary,
+    },
+    captchaButtonVerified: {
+      backgroundColor: theme.success,
+    },
+    captchaButtonText: {
+      color: theme.white,
+      fontWeight: "700",
+      fontSize: responsiveFontSize(12),
+      textTransform: "uppercase",
+    },
+    submitButton: {
+      borderRadius: 10,
+      overflow: "hidden",
+    },
+    submitGradient: {
+      paddingVertical: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    submitText: {
+      color: theme.white,
+      fontSize: responsiveFontSize(16),
+      fontWeight: "700",
+      textTransform: "uppercase",
+    },
+    loginLink: {
+      marginTop: 14,
+      alignItems: "center",
+    },
+    loginText: {
+      color: theme.text,
+      fontSize: responsiveFontSize(13),
+    },
+    loginTextHighlight: {
+      color: theme.primary,
+      fontWeight: "700",
+    },
+  });
 
 export default SignUpScreen;

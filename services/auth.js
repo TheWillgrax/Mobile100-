@@ -13,3 +13,17 @@ export async function signIn(identifier, password) {
 export async function signOut() {
   await Promise.all([storage.del("token"), storage.del("user")]);
 }
+
+export async function updateProfile(updates) {
+  const { data } = await api.put("/users/me", updates);
+  await storage.set("user", JSON.stringify(data));
+  return data;
+}
+
+export async function changePassword(currentPassword, password, passwordConfirmation) {
+  await api.post("/auth/change-password", {
+    currentPassword,
+    password,
+    passwordConfirmation,
+  });
+}

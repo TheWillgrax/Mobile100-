@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,12 +14,15 @@ import {
 } from "react-native";
 
 import SafeScreen from "../components/SafeScreen";
-import { COLORS } from "../constants/colors";
+import { useTheme } from "../hooks/theme";
+import { responsiveFontSize } from "../utils/responsive";
 import { useCart } from "./providers/CartProvider";
 
 const CheckoutScreen = () => {
   const router = useRouter();
   const { items, totalFormatted, clearCart, formatCurrency } = useCart();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -44,16 +47,12 @@ const CheckoutScreen = () => {
     setTimeout(() => {
       setSubmitting(false);
       clearCart();
-      Alert.alert(
-        "¡Pedido confirmado!",
-        "Nuestro equipo se pondrá en contacto para coordinar el envío.",
-        [
-          {
-            text: "Aceptar",
-            onPress: () => router.replace("/(tabs)/index"),
-          },
-        ]
-      );
+      Alert.alert("¡Pedido confirmado!", "Nuestro equipo se pondrá en contacto para coordinar el envío.", [
+        {
+          text: "Aceptar",
+          onPress: () => router.replace("/(tabs)/index"),
+        },
+      ]);
     }, 500);
   };
 
@@ -98,6 +97,7 @@ const CheckoutScreen = () => {
             <TextInput
               style={styles.input}
               placeholder="Nombre completo"
+              placeholderTextColor={theme.textLight}
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
@@ -105,6 +105,7 @@ const CheckoutScreen = () => {
             <TextInput
               style={styles.input}
               placeholder="Teléfono"
+              placeholderTextColor={theme.textLight}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
@@ -112,6 +113,7 @@ const CheckoutScreen = () => {
             <TextInput
               style={[styles.input, styles.multiline]}
               placeholder="Dirección de entrega"
+              placeholderTextColor={theme.textLight}
               value={address}
               onChangeText={setAddress}
               multiline
@@ -119,6 +121,7 @@ const CheckoutScreen = () => {
             <TextInput
               style={[styles.input, styles.multiline]}
               placeholder="Notas adicionales (opcional)"
+              placeholderTextColor={theme.textLight}
               value={notes}
               onChangeText={setNotes}
               multiline
@@ -130,7 +133,7 @@ const CheckoutScreen = () => {
             onPress={handleSubmit}
             disabled={submitting}
           >
-            <Ionicons name="checkmark-circle-outline" size={22} color={COLORS.white} />
+            <Ionicons name="checkmark-circle-outline" size={22} color={theme.white} />
             <Text style={styles.submitText}>
               {submitting ? "Procesando..." : "Confirmar pedido"}
             </Text>
@@ -141,96 +144,103 @@ const CheckoutScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    paddingBottom: 40,
-    gap: 24,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-  section: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.text,
-  },
-  summarySubtitle: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    marginTop: 2,
-  },
-  summaryAmount: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-  summaryTotalLabel: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-  summaryTotalValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginVertical: 6,
-  },
-  input: {
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    fontSize: 15,
-    color: COLORS.text,
-  },
-  multiline: {
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  submitButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    borderRadius: 999,
-  },
-  submitText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: {
+      padding: 16,
+      paddingBottom: 40,
+      gap: 24,
+    },
+    title: {
+      fontSize: responsiveFontSize(24),
+      fontWeight: "700",
+      color: theme.text,
+    },
+    section: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 16,
+      gap: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      shadowColor: theme.shadow,
+      shadowOpacity: 0.05,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    sectionTitle: {
+      fontSize: responsiveFontSize(16),
+      fontWeight: "700",
+      color: theme.text,
+    },
+    summaryRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+    },
+    summaryTitle: {
+      fontSize: responsiveFontSize(15),
+      fontWeight: "600",
+      color: theme.text,
+    },
+    summarySubtitle: {
+      fontSize: responsiveFontSize(13),
+      color: theme.textLight,
+      marginTop: 2,
+    },
+    summaryAmount: {
+      fontSize: responsiveFontSize(15),
+      fontWeight: "700",
+      color: theme.text,
+    },
+    summaryTotalLabel: {
+      fontSize: responsiveFontSize(17),
+      fontWeight: "700",
+      color: theme.text,
+    },
+    summaryTotalValue: {
+      fontSize: responsiveFontSize(18),
+      fontWeight: "700",
+      color: theme.primary,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: theme.border,
+      marginVertical: 12,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: responsiveFontSize(14),
+      color: theme.text,
+      backgroundColor: theme.surface,
+    },
+    multiline: {
+      minHeight: 96,
+      textAlignVertical: "top",
+    },
+    submitButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      backgroundColor: theme.primary,
+      paddingVertical: 14,
+      borderRadius: 999,
+    },
+    submitText: {
+      color: theme.white,
+      fontWeight: "700",
+      fontSize: responsiveFontSize(15),
+      textTransform: "uppercase",
+    },
+    disabled: {
+      opacity: 0.7,
+    },
+  });
 
 export default CheckoutScreen;

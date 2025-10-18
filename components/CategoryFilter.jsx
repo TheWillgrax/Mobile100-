@@ -2,15 +2,14 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef } from "react";
 import { Animated, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { homeStyles } from "../assets/styles/home.styles";
 
-export default function CategoryFilter({ categories, selectedCategory, onSelectCategory }) {
+export default function CategoryFilter({ categories, selectedCategory, onSelectCategory, styles }) {
   return (
-    <View style={homeStyles.categoryFilterContainer}>
+    <View style={styles.categoryFilterContainer}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={homeStyles.categoryFilterScrollContent}
+        contentContainerStyle={styles.categoryFilterScrollContent}
         decelerationRate="fast"
         snapToInterval={120}
         snapToAlignment="center"
@@ -24,6 +23,7 @@ export default function CategoryFilter({ categories, selectedCategory, onSelectC
               isSelected={isSelected}
               onPress={() => onSelectCategory(category.name)}
               index={index}
+              styles={styles}
             />
           );
         })}
@@ -32,19 +32,18 @@ export default function CategoryFilter({ categories, selectedCategory, onSelectC
   );
 }
 
-function CategoryButton({ category, isSelected, onPress, index }) {
+function CategoryButton({ category, isSelected, onPress, index, styles }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animación de entrada con retraso escalonado
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       delay: index * 100,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim, index]);
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -70,8 +69,8 @@ function CategoryButton({ category, isSelected, onPress, index }) {
     >
       <TouchableOpacity
         style={[
-          homeStyles.categoryButton,
-          isSelected && homeStyles.selectedCategory,
+          styles.categoryButton,
+          isSelected && styles.selectedCategory,
           {
             elevation: isSelected ? 8 : 3,
             shadowColor: isSelected ? "#6366f1" : "#000",
@@ -80,7 +79,7 @@ function CategoryButton({ category, isSelected, onPress, index }) {
             shadowRadius: isSelected ? 8 : 4,
             borderWidth: isSelected ? 2 : 0,
             borderColor: isSelected ? "#6366f1" : "transparent",
-          }
+          },
         ]}
         onPress={onPress}
         onPressIn={handlePressIn}
@@ -101,40 +100,44 @@ function CategoryButton({ category, isSelected, onPress, index }) {
             }}
           />
         )}
-        
-        <View style={{
-          position: "relative",
-          marginBottom: 8,
-        }}>
+
+        <View
+          style={{
+            position: "relative",
+            marginBottom: 8,
+          }}
+        >
           <Image
             source={{ uri: category.image }}
             style={[
-              homeStyles.categoryImage,
-              isSelected && homeStyles.selectedCategoryImage,
+              styles.categoryImage,
+              isSelected && styles.selectedCategoryImage,
               {
                 borderRadius: 12,
                 borderWidth: isSelected ? 3 : 0,
                 borderColor: "#fff",
-              }
+              },
             ]}
             contentFit="cover"
             transition={300}
           />
-          
+
           {isSelected && (
-            <View style={{
-              position: "absolute",
-              top: -2,
-              right: -2,
-              width: 20,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: "#10b981",
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: 2,
-              borderColor: "#fff",
-            }}>
+            <View
+              style={{
+                position: "absolute",
+                top: -2,
+                right: -2,
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                backgroundColor: "#10b981",
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 2,
+                borderColor: "#fff",
+              }}
+            >
               <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>✓</Text>
             </View>
           )}
@@ -142,29 +145,31 @@ function CategoryButton({ category, isSelected, onPress, index }) {
 
         <Text
           style={[
-            homeStyles.categoryText,
-            isSelected && homeStyles.selectedCategoryText,
+            styles.categoryText,
+            isSelected && styles.selectedCategoryText,
             {
               fontWeight: isSelected ? "700" : "500",
               fontSize: isSelected ? 13 : 12,
               textAlign: "center",
-            }
+            },
           ]}
         >
           {category.name}
         </Text>
 
         {isSelected && (
-          <View style={{
-            position: "absolute",
-            bottom: -2,
-            left: "50%",
-            marginLeft: -6,
-            width: 12,
-            height: 3,
-            borderRadius: 2,
-            backgroundColor: "#6366f1",
-          }} />
+          <View
+            style={{
+              position: "absolute",
+              bottom: -2,
+              left: "50%",
+              marginLeft: -6,
+              width: 12,
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: "#6366f1",
+            }}
+          />
         )}
       </TouchableOpacity>
     </Animated.View>
