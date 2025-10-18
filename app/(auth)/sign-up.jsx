@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,21 @@ const SignUpScreen = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [captchaQuestion, setCaptchaQuestion] = useState("");
+  const [captchaAnswer, setCaptchaAnswer] = useState("");
+  const [captchaInput, setCaptchaInput] = useState("");
+
+  const generateCaptcha = () => {
+    const a = Math.floor(Math.random() * 9) + 1;
+    const b = Math.floor(Math.random() * 9) + 1;
+    setCaptchaQuestion(`¿Cuánto es ${a} + ${b}?`);
+    setCaptchaAnswer(String(a + b));
+    setCaptchaInput("");
+  };
+
+  useEffect(() => {
+    generateCaptcha();
+  }, []);
 
   const handleSignUp = () => {
     if (!email.trim() || !password.trim()) {
@@ -36,6 +51,15 @@ const SignUpScreen = () => {
     }
     if (password.length < 6) {
       Alert.alert("Contraseña", "Debe tener al menos 6 caracteres");
+      return;
+    }
+    if (!captchaInput.trim()) {
+      Alert.alert("Verificación", "Resuelve el captcha para continuar");
+      return;
+    }
+    if (captchaInput.trim() !== captchaAnswer) {
+      Alert.alert("Captcha incorrecto", "Inténtalo nuevamente");
+      generateCaptcha();
       return;
     }
 
@@ -173,6 +197,66 @@ const SignUpScreen = () => {
                   color={COLORS.textLight}
                 />
               </TouchableOpacity>
+            </View>
+
+            {/* Captcha */}
+            <View
+              style={{
+                borderWidth: 2,
+                borderColor: "#dee2e6",
+                borderRadius: 10,
+                marginBottom: 18,
+                padding: 12,
+                backgroundColor: COLORS.background,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    color: COLORS.text,
+                    fontWeight: "600",
+                    fontSize: 14,
+                  }}
+                >
+                  {captchaQuestion}
+                </Text>
+                <TouchableOpacity onPress={generateCaptcha}>
+                  <Ionicons name="refresh" size={20} color={COLORS.primary} />
+                </TouchableOpacity>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <Ionicons
+                  name="shield-checkmark"
+                  size={22}
+                  color={COLORS.primary}
+                />
+                <TextInput
+                  style={{
+                    flex: 1,
+                    marginLeft: 10,
+                    paddingVertical: 8,
+                    color: COLORS.text,
+                    fontSize: 15,
+                  }}
+                  placeholder="Escribe el resultado"
+                  placeholderTextColor={COLORS.textLight}
+                  keyboardType="number-pad"
+                  value={captchaInput}
+                  onChangeText={setCaptchaInput}
+                />
+              </View>
             </View>
 
             {/* Botón registro estilo Bootstrap */}
