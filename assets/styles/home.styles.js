@@ -20,11 +20,40 @@ export const homeStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  welcomeTextContainer: {
+    flex: 1,
+    marginRight: 16,
+  },
   welcomeText: {
     fontSize: 32,
     fontWeight: "800",
     color: COLORS.text,
     letterSpacing: -0.5,
+  },
+  welcomeSubtitle: {
+    marginTop: 4,
+    fontSize: 14,
+    color: COLORS.textLight,
+  },
+  signInButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  signInButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  welcomeIcons: {
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    paddingHorizontal: 20,
+    marginBottom: 8,
   },
   featuredSection: {
     paddingHorizontal: 20,

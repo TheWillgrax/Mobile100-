@@ -104,24 +104,26 @@ const HomeScreen = () => {
       >
         {/* CONTENIDO ORIGINAL SIN PROVEEDORES CERCANOS */}
         <View style={homeStyles.welcomeSection}>
+          <View style={homeStyles.welcomeTextContainer}>
+            <Text style={homeStyles.welcomeText}>Bienvenido</Text>
+            <Text style={homeStyles.welcomeSubtitle}>
+              Estás explorando como invitado
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => router.push("/(auth)/sign-in")}
+            style={homeStyles.signInButton}
+          >
+            <Ionicons name="log-in-outline" size={20} color={COLORS.white} />
+            <Text style={homeStyles.signInButtonText}>Iniciar sesión</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={homeStyles.welcomeIcons}>
           <Ionicons name="car-outline" size={80} color="#444" />
           <Ionicons name="construct-outline" size={80} color="#444" />
           <Ionicons name="settings-outline" size={80} color="#444" />
-
-          {/* Botón Cerrar sesión */}
-          <TouchableOpacity
-            onPress={() => router.replace("/(auth)/sign-in")}
-            style={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              backgroundColor: COLORS.primary,
-              padding: 10,
-              borderRadius: 50,
-            }}
-          >
-            <Ionicons name="log-out-outline" size={28} color="#fff" />
-          </TouchableOpacity>
         </View>
 
         {/* FEATURED SECTION */}
