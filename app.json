@@ -11,9 +11,8 @@
 
     "extra": {
       "API_URL": "http://192.168.0.4:1337/api",
-      "recaptchaSiteKey": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
-      "recaptchaDomain": "https://autoparts-app.mobile",
-      "recaptchaLanguage": "es"
+      "captchaLength": 6,
+      "captchaCharset": "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     },
 
     "ios": {
