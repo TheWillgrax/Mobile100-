@@ -18,8 +18,7 @@ import {
 import { useAuth } from "../../hooks/auth";
 import { useTheme } from "../../hooks/theme";
 import { responsiveFontSize } from "../../utils/responsive";
-import { RECAPTCHA_CONFIG } from "../../utils/config";
-import RecaptchaModal from "../../components/RecaptchaModal";
+import CaptchaModal from "../../components/CaptchaModal";
 
 const SignInScreen = () => {
   const router = useRouter();
@@ -30,34 +29,20 @@ const SignInScreen = () => {
     () => [theme.primary, theme.secondary ?? theme.primary, theme.accent ?? theme.primary],
     [theme]
   );
-  const { siteKey, domain, language } = RECAPTCHA_CONFIG;
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState(null);
-  const recaptchaRef = useRef(null);
+  const captchaRef = useRef(null);
 
-  const handleRecaptchaError = (message) => {
-    const errorMessage =
-      message && typeof message === "string"
-        ? message
-        : "No pudimos cargar el reCAPTCHA. Por favor, verifica tu conexión e inténtalo nuevamente.";
-    Alert.alert(
-      "Error con reCAPTCHA",
-      `${errorMessage}\nSi el problema persiste, revisa que el dominio configurado para la clave coincida con ${domain}.`
-    );
-  };
-
-  const handleRecaptchaVerify = (token) => {
+  const handleCaptchaVerify = (token) => {
     setCaptchaToken(token);
-    Alert.alert("Verificación completada", "reCAPTCHA resuelto correctamente");
   };
 
-  const handleRecaptchaExpire = () => {
+  const handleCaptchaCancel = () => {
     setCaptchaToken(null);
-    Alert.alert("Verificación requerida", "El reCAPTCHA ha expirado, inténtalo nuevamente");
+    Alert.alert("Verificación requerida", "Resuelve el CAPTCHA para continuar");
   };
 
   const handleSignIn = async () => {
@@ -66,8 +51,8 @@ const SignInScreen = () => {
       return;
     }
     if (!captchaToken) {
-      Alert.alert("Verificación", "Completa el reCAPTCHA antes de continuar");
-      recaptchaRef.current?.open();
+      Alert.alert("Verificación", "Completa el CAPTCHA antes de continuar");
+      captchaRef.current?.open();
       return;
     }
     try {
@@ -149,7 +134,7 @@ const SignInScreen = () => {
 
             <View style={[styles.cardSection, captchaToken && styles.cardSectionSuccess]}>
               <View style={styles.captchaTextContainer}>
-                <Text style={styles.captchaTitle}>Protección reCAPTCHA</Text>
+                <Text style={styles.captchaTitle}>Protección CAPTCHA</Text>
                 <Text style={styles.captchaSubtitle}>
                   {captchaToken
                     ? "Verificación completada correctamente"
@@ -157,7 +142,7 @@ const SignInScreen = () => {
                 </Text>
               </View>
               <TouchableOpacity
-                onPress={() => recaptchaRef.current?.open()}
+                onPress={() => captchaRef.current?.open()}
                 style={[styles.captchaButton, captchaToken && styles.captchaButtonVerified]}
               >
                 <Text style={styles.captchaButtonText}>
@@ -201,15 +186,7 @@ const SignInScreen = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <RecaptchaModal
-        ref={recaptchaRef}
-        siteKey={siteKey}
-        siteDomain={domain}
-        language={language}
-        onVerify={handleRecaptchaVerify}
-        onExpire={handleRecaptchaExpire}
-        onError={handleRecaptchaError}
-      />
+      <CaptchaModal ref={captchaRef} onVerify={handleCaptchaVerify} onCancel={handleCaptchaCancel} />
     </LinearGradient>
   );
 };

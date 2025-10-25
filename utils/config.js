@@ -8,9 +8,14 @@ export const getConfigValue = (key, fallback = undefined) => {
   return value !== undefined && value !== null && value !== "" ? value : fallback;
 };
 
-export const RECAPTCHA_CONFIG = {
-  siteKey: getConfigValue("recaptchaSiteKey", "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"),
-  domain: getConfigValue("recaptchaDomain", "https://autoparts-app.mobile"),
-  language: getConfigValue("recaptchaLanguage", "es"),
+const parseLength = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(parsed, 4), 12);
+};
+
+export const CAPTCHA_CONFIG = {
+  length: parseLength(getConfigValue("captchaLength", 6), 6),
+  charset: getConfigValue("captchaCharset", "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
 };
 
