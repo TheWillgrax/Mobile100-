@@ -5,8 +5,13 @@ import { storage } from "./storage";
 
 const fallbackBaseURL =
   Platform.OS === "android"
-    ? "http://192.168.68.55:1337/api"   // emulador Android
+    ? "http://192.168.68.55:1337/api" // emulador Android
     : "http://localhost:1337/api"; // web / iOS simulador
+
+const authorizerToken =
+  process.env.EXPO_PUBLIC_API_AUTHORIZER ??
+  process.env.EXPO_PUBLIC_API_AUTHORIZER_TOKEN ??
+  null;
 
 export const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL || fallbackBaseURL,
@@ -20,6 +25,13 @@ api.interceptors.request.use(async (config = {}) => {
       config.headers = config.headers ?? {};
       if (!config.headers.Authorization) {
         config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
+    if (authorizerToken) {
+      config.headers = config.headers ?? {};
+      if (!config.headers.Authorizer) {
+        config.headers.Authorizer = authorizerToken;
       }
     }
   } catch {}
