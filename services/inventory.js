@@ -2,11 +2,49 @@
 import { api } from "./api";
 
 const INVENTORY_ENDPOINT = "/bulkloadinventory/all";
-const CREATE_INVENTORY_ENDPOINT = "/bulkloadinventory/createOne";
+const CREATE_INVENTORY_ENDPOINTS = [
+  "/bulkloadinventory/create",
+  "/bulkloadinventory/createOne",
+];
 const INVENTORY_BASE_ENDPOINT = "/bulkloadinventory";
-const PRODUCTS_ENDPOINT = "/products";
-const UPDATE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/updateOne/${id}`;
-const DELETE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/deleteOne/${id}`;
+const UPDATE_INVENTORY_ENDPOINTS = (id) => [
+  `${INVENTORY_BASE_ENDPOINT}/update/${id}`,
+  `${INVENTORY_BASE_ENDPOINT}/updateOne/${id}`,
+];
+const DELETE_INVENTORY_ENDPOINTS = (id) => [
+  `${INVENTORY_BASE_ENDPOINT}/delete/${id}`,
+  `${INVENTORY_BASE_ENDPOINT}/deleteOne/${id}`,
+];
+
+const shouldFallbackRequest = (error) => {
+  const status = error?.response?.status;
+  if (!status) return false;
+  if (status === 404 || status === 405) return true;
+  if (status >= 500 && status < 600) return true;
+  return false;
+};
+
+const executeWithFallback = async (attempts) => {
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    try {
+      const result = await attempt();
+      return result;
+    } catch (error) {
+      lastError = error;
+      if (!shouldFallbackRequest(error)) {
+        throw error;
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  return null;
+};
 
 const getStrapiBaseURL = () => {
   const baseURL = api.defaults?.baseURL ?? "";
@@ -136,7 +174,6 @@ const unwrapInventoryResponse = (payload) => {
 export async function fetchInventoryItems() {
   try {
     const response = await api.get(INVENTORY_ENDPOINT);
-    const products = await api.get(PRODUCTS_ENDPOINT);
 
     const rawItems = unwrapInventoryResponse(response?.data);
     return rawItems
@@ -154,19 +191,25 @@ export async function fetchInventoryItems() {
   }
 }
 
-const buildInventoryPayload = ({ productId, product, quantity, vendor }) => {
+const sanitizeInventoryBasePayload = ({ productId, product, vendor }) => {
   const payload = {};
 
   if (productId) {
     payload.productId = productId;
   }
 
-  if (product) {
-    payload.product = product;
-  }
+  if (product && typeof product === "object") {
+    const sanitizedProduct = {};
 
-  if (quantity !== undefined) {
-    payload.quantity = quantity;
+    Object.entries(product).forEach(([key, value]) => {
+      if (value !== undefined && value !== "") {
+        sanitizedProduct[key] = value;
+      }
+    });
+
+    if (Object.keys(sanitizedProduct).length > 0) {
+      payload.product = sanitizedProduct;
+    }
   }
 
   if (vendor !== undefined) {
@@ -176,11 +219,61 @@ const buildInventoryPayload = ({ productId, product, quantity, vendor }) => {
   return payload;
 };
 
+const buildInventoryPayload = ({ productId, product, quantity, vendor }) => {
+  const payload = sanitizeInventoryBasePayload({ productId, product, vendor });
+  const normalizedQuantity = parseNumber(quantity);
+
+  if (normalizedQuantity !== null) {
+    payload.quantity = normalizedQuantity;
+  }
+
+  return payload;
+};
+
+const buildInventoryAdjustmentPayload = ({
+  productId,
+  product,
+  quantity,
+  vendor,
+  previousQuantity,
+}) => {
+  const payload = sanitizeInventoryBasePayload({ productId, product, vendor });
+  const nextQuantity = parseNumber(quantity);
+  const prevQuantity = parseNumber(previousQuantity);
+
+  if (nextQuantity !== null && prevQuantity !== null) {
+    const difference = nextQuantity - prevQuantity;
+
+    if (difference > 0) {
+      payload.quantity = difference;
+      payload.action = "add";
+    } else if (difference < 0) {
+      payload.quantity = Math.abs(difference);
+      payload.action = "remove";
+    }
+  } else if (nextQuantity !== null) {
+    payload.quantity = nextQuantity;
+  }
+
+  if (payload.quantity === undefined) {
+    delete payload.quantity;
+  }
+
+  if (payload.action === undefined) {
+    delete payload.action;
+  }
+
+  return payload;
+};
+
 export async function createInventoryRecord({ productId, product, quantity, vendor }) {
   try {
-    const response = await api.post(
-      CREATE_INVENTORY_ENDPOINT,
-      buildInventoryPayload({ productId, product, quantity, vendor })
+    const basePayload = buildInventoryPayload({ productId, product, quantity, vendor });
+
+    const response = await executeWithFallback(
+      CREATE_INVENTORY_ENDPOINTS.map((endpoint) => () =>
+        api.post(endpoint, basePayload)
+      )
     );
 
     const createdItem =
@@ -199,16 +292,38 @@ export async function createInventoryRecord({ productId, product, quantity, vend
   }
 }
 
-export async function updateInventoryRecord(id, { productId, product, quantity, vendor }) {
+export async function updateInventoryRecord(
+  id,
+  { productId, product, quantity, vendor, previousQuantity, currentQuantity, originalQuantity }
+) {
   if (!id) {
     throw new Error("El identificador del inventario es obligatorio.");
   }
 
   try {
-    const response = await api.put(
-      UPDATE_INVENTORY_ENDPOINT(id),
-      buildInventoryPayload({ productId, product, quantity, vendor })
-    );
+    const normalizedPreviousQuantity =
+      previousQuantity ?? currentQuantity ?? originalQuantity ?? null;
+
+    const basePayload = buildInventoryPayload({ productId, product, quantity, vendor });
+
+    const adjustmentPayload = buildInventoryAdjustmentPayload({
+      productId,
+      product,
+      quantity,
+      vendor,
+      previousQuantity: normalizedPreviousQuantity,
+    });
+
+    const attempts = [];
+    const [modernEndpoint, legacyEndpoint] = UPDATE_INVENTORY_ENDPOINTS(id);
+
+    if (Object.keys(adjustmentPayload).length > 0) {
+      attempts.push(() => api.patch(modernEndpoint, adjustmentPayload));
+    }
+
+    attempts.push(() => api.put(legacyEndpoint, basePayload));
+
+    const response = await executeWithFallback(attempts);
 
     const updatedItem =
       response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
@@ -232,7 +347,9 @@ export async function deleteInventoryRecord(id) {
   }
 
   try {
-    await api.delete(DELETE_INVENTORY_ENDPOINT(id));
+    await executeWithFallback(
+      DELETE_INVENTORY_ENDPOINTS(id).map((endpoint) => () => api.delete(endpoint))
+    );
   } catch (error) {
     console.error("Error deleting inventory record:", error);
     const err = new Error(
