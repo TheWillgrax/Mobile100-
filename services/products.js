@@ -1,7 +1,55 @@
 // services/products.js
 import { api } from "./api";
 
-const PRODUCTS_ENDPOINT = "/products";
+const PRODUCT_LIST_ENDPOINTS = [
+  "/products/all",
+  "/products/getAll",
+  "/products/getProducts",
+];
+const PRODUCT_LEGACY_ENDPOINT = "/products";
+const PRODUCT_CREATE_ENDPOINTS = [
+  "/products/createProduct",
+  PRODUCT_LEGACY_ENDPOINT,
+];
+const PRODUCT_UPDATE_ENDPOINTS = (id) => [
+  `/products/updateProduct/${id}`,
+  `/products/${id}`,
+];
+const PRODUCT_UPDATE_QUERY_ENDPOINT = "/products/updateProduct";
+const PRODUCT_DELETE_ENDPOINTS = (id) => [
+  `/products/deleteProduct/${id}`,
+  `/products/${id}`,
+];
+const PRODUCT_DELETE_QUERY_ENDPOINT = "/products/deleteProduct";
+
+const shouldFallbackRequest = (error) => {
+  const status = error?.response?.status;
+  if (!status) return false;
+  if (status === 404 || status === 405) return true;
+  if (status >= 500 && status < 600) return true;
+  return false;
+};
+
+const executeWithFallback = async (attempts) => {
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    try {
+      return await attempt();
+    } catch (error) {
+      lastError = error;
+      if (!shouldFallbackRequest(error)) {
+        throw error;
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  return null;
+};
 
 const parseNumber = (value) => {
   if (value === null || value === undefined) return null;
@@ -15,9 +63,63 @@ const unwrapProductsResponse = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.items)) return payload.items;
   if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(payload?.products)) return payload.products;
+  if (Array.isArray(payload?.data?.products)) return payload.data.products;
   if (payload?.data?.data && Array.isArray(payload.data.data)) return payload.data.data;
   return [];
 };
+
+const sanitizeProductPayload = (product = {}) => {
+  const sanitized = { ...product };
+
+  ["name", "code", "description", "vendorCode", "type"].forEach((key) => {
+    if (sanitized[key] === undefined) return;
+    if (typeof sanitized[key] === "string") {
+      const trimmed = sanitized[key].trim();
+      if (trimmed) {
+        sanitized[key] = trimmed;
+      } else {
+        delete sanitized[key];
+      }
+    }
+  });
+
+  ["salePrice", "wholesalePrice", "retailPrice"].forEach((key) => {
+    if (!(key in sanitized)) return;
+
+    const value = sanitized[key];
+
+    if (value === undefined || value === "") {
+      delete sanitized[key];
+      return;
+    }
+
+    if (value === null) {
+      sanitized[key] = null;
+      return;
+    }
+
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      sanitized[key] = Number.isFinite(parsed) ? parsed : null;
+      return;
+    }
+
+    if (!Number.isFinite(value)) {
+      delete sanitized[key];
+    }
+  });
+
+  Object.keys(sanitized).forEach((key) => {
+    if (sanitized[key] === undefined) {
+      delete sanitized[key];
+    }
+  });
+
+  return sanitized;
+};
+
+const wrapAsStrapiPayload = (payload) => ({ data: payload });
 
 const normalizeProduct = (entry) => {
   if (!entry) return null;
@@ -53,8 +155,13 @@ const normalizeProduct = (entry) => {
 
 export async function fetchProducts() {
   try {
-    const response = await api.get(PRODUCTS_ENDPOINT, {
-    });
+    const attempts = PRODUCT_LIST_ENDPOINTS.filter(Boolean).map((endpoint) => () =>
+      api.get(endpoint)
+    );
+
+    attempts.push(() => api.get(PRODUCT_LEGACY_ENDPOINT, { params: { populate: "*" } }));
+
+    const response = await executeWithFallback(attempts);
 
     const rawItems = unwrapProductsResponse(response?.data);
     return rawItems
@@ -70,32 +177,15 @@ export async function fetchProducts() {
   }
 }
 
-const buildProductPayload = (product) => {
-  const sanitized = { ...product };
-
-  ["salePrice", "wholesalePrice", "retailPrice"].forEach((key) => {
-    if (sanitized[key] === "" || sanitized[key] === null || sanitized[key] === undefined) {
-      sanitized[key] = null;
-      return;
-    }
-
-    if (typeof sanitized[key] === "string") {
-      const parsed = Number(sanitized[key]);
-      sanitized[key] = Number.isFinite(parsed) ? parsed : null;
-      return;
-    }
-
-    if (Number.isNaN(sanitized[key])) {
-      sanitized[key] = null;
-    }
-  });
-
-  return { data: sanitized };
-};
-
 export async function createProduct(product) {
   try {
-    const response = await api.post(PRODUCTS_ENDPOINT, buildProductPayload(product));
+    const sanitizedPayload = sanitizeProductPayload(product);
+    const [modernEndpoint, legacyEndpoint] = PRODUCT_CREATE_ENDPOINTS;
+
+    const response = await executeWithFallback([
+      () => api.post(modernEndpoint, sanitizedPayload),
+      () => api.post(legacyEndpoint, wrapAsStrapiPayload(sanitizedPayload)),
+    ]);
     const createdItem =
       response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
     return normalizeProduct(createdItem);
@@ -115,10 +205,14 @@ export async function updateProduct(id, product) {
   }
 
   try {
-    const response = await api.put(
-      `${PRODUCTS_ENDPOINT}/${id}`,
-      buildProductPayload(product)
-    );
+    const sanitizedPayload = sanitizeProductPayload(product);
+    const [modernEndpoint, legacyEndpoint] = PRODUCT_UPDATE_ENDPOINTS(id);
+
+    const response = await executeWithFallback([
+      () => api.put(modernEndpoint, sanitizedPayload),
+      () => api.put(PRODUCT_UPDATE_QUERY_ENDPOINT, sanitizedPayload, { params: { id } }),
+      () => api.put(legacyEndpoint, wrapAsStrapiPayload(sanitizedPayload)),
+    ]);
     const updatedItem =
       response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
     return normalizeProduct(updatedItem);
@@ -138,7 +232,13 @@ export async function deleteProduct(id) {
   }
 
   try {
-    await api.delete(`${PRODUCTS_ENDPOINT}/${id}`);
+    const [modernEndpoint, legacyEndpoint] = PRODUCT_DELETE_ENDPOINTS(id);
+
+    await executeWithFallback([
+      () => api.delete(modernEndpoint),
+      () => api.delete(PRODUCT_DELETE_QUERY_ENDPOINT, { params: { id } }),
+      () => api.delete(legacyEndpoint),
+    ]);
   } catch (error) {
     console.error("Error deleting product:", error);
     const err = new Error(

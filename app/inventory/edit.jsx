@@ -94,6 +94,15 @@ const InventoryEditScreen = () => {
       return;
     }
 
+    const initialQuantityNumber = Number(initialQuantity);
+    const normalizedPreviousQuantity =
+      initialQuantity !== null &&
+      initialQuantity !== undefined &&
+      `${initialQuantity}`.trim() !== "" &&
+      Number.isFinite(initialQuantityNumber)
+        ? initialQuantityNumber
+        : null;
+
     setSubmitting(true);
     setError(null);
 
@@ -109,6 +118,7 @@ const InventoryEditScreen = () => {
             : undefined,
         quantity: parsedQuantity,
         vendor: trimmedVendor || undefined,
+        previousQuantity: normalizedPreviousQuantity,
       });
 
       Alert.alert(
