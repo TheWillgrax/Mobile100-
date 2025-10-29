@@ -1,62 +1,66 @@
 // services/providers.js
-import { api } from './api';
+import { api } from "./api";
+
+const PROVIDERS_ENDPOINT = "/providers";
+
+const getMockProviders = () => [
+  {
+    id: "mock-1",
+    name: "Autopartes Express",
+    address: "Av. Siempre Viva 742",
+    distance: "1.2 km",
+    phone: "+52 55 1234 5678",
+  },
+  {
+    id: "mock-2",
+    name: "Refacciones del Norte",
+    address: "Calle Principal 123",
+    distance: "2.8 km",
+    phone: "+52 55 9876 5432",
+  },
+];
+
+const unwrapProvidersResponse = (payload) => {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.providers)) return payload.providers;
+  return [];
+};
 
 export async function fetchNearbyProviders(latitude, longitude, limit = 10) {
   try {
-    console.log('📍 Buscando proveedores cercanos para:', latitude, longitude);
-    
-    const response = await api.get(`/provider/nearby`, {
+    const response = await api.get(`${PROVIDERS_ENDPOINT}/nearby`, {
       params: {
         lat: latitude,
         lng: longitude,
-        limit: limit
-      }
+        limit,
+      },
     });
-    
-    console.log('✅ Proveedores cercanos encontrados:', response.data?.length || 0);
-    
-    // Manejar diferentes formatos de respuesta
-    if (Array.isArray(response.data)) {
-      return response.data;
-    } else if (response.data && Array.isArray(response.data.data)) {
-      return response.data.data;
-    } else if (response.data && Array.isArray(response.data.providers)) {
-      return response.data.providers;
-    } else {
-      console.warn('Formato de respuesta inesperado:', response.data);
-      return [];
-    }
+
+    return unwrapProvidersResponse(response?.data);
   } catch (error) {
-    console.error('❌ Error fetching nearby providers:', {
+    console.error("❌ Error fetching nearby providers:", {
       message: error.message,
       status: error.response?.status,
-      url: error.config?.url
+      url: error.config?.url,
     });
-    
-    // Fallback a datos mock si la API falla
-    if (error.response?.status === 403 || error.code === 'ECONNREFUSED') {
-      console.warn('📱 Usando datos de prueba...');
+
+    if (error.response?.status === 403 || error.response?.status === 404 || error.code === "ECONNREFUSED") {
+      console.warn("📱 Usando datos de prueba...");
       return getMockProviders();
     }
-    
-    throw new Error('No se pudieron cargar los proveedores cercanos');
+
+    throw new Error("No se pudieron cargar los proveedores cercanos");
   }
 }
 
-// Función alternativa para obtener todos los proveedores (si necesitas)
 export async function fetchAllProviders() {
   try {
-    const response = await api.get('/provider');
-    
-    if (Array.isArray(response.data)) {
-      return response.data;
-    } else if (response.data && Array.isArray(response.data.data)) {
-      return response.data.data;
-    } else {
-      return [];
-    }
+    const response = await api.get(PROVIDERS_ENDPOINT);
+    return unwrapProvidersResponse(response?.data);
   } catch (error) {
-    console.error('Error fetching all providers:', error);
+    console.error("Error fetching all providers:", error);
     return getMockProviders();
   }
 }
