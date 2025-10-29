@@ -20,6 +20,19 @@ export default function InventoryCard({ item }) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
+  const metaItems = useMemo(
+    () =>
+      [
+        item?.sku ? `SKU: ${item.sku}` : null,
+        item?.vendor ? `Proveedor: ${item.vendor}` : null,
+        item?.statusLabel || item?.status
+          ? `Estado: ${item.statusLabel ?? item.status}`
+          : null,
+        item?.type ? `Tipo: ${item.type}` : null,
+      ].filter(Boolean),
+    [item]
+  );
+
   return (
     <View style={styles.card}>
       {item.image ? (
@@ -35,18 +48,15 @@ export default function InventoryCard({ item }) {
           {item.name}
         </Text>
 
-        <View style={styles.metaRow}>
-          {!!item.sku && (
-            <Text style={styles.meta} numberOfLines={1}>
-              SKU: {item.sku}
-            </Text>
-          )}
-          {!!item.brand && (
-            <Text style={styles.meta} numberOfLines={1}>
-              Marca: {item.brand}
-            </Text>
-          )}
-        </View>
+        {metaItems.length > 0 && (
+          <View style={styles.metaRow}>
+            {metaItems.map((text, index) => (
+              <Text key={index} style={styles.meta} numberOfLines={1}>
+                {text}
+              </Text>
+            ))}
+          </View>
+        )}
 
         <View style={styles.infoRow}>
           <Text style={styles.stock} numberOfLines={1}>
