@@ -4,6 +4,7 @@ import { api } from "./api";
 const INVENTORY_ENDPOINT = "/bulkloadinventory/all";
 const CREATE_INVENTORY_ENDPOINT = "/bulkloadinventory/createOne";
 const INVENTORY_BASE_ENDPOINT = "/bulkloadinventory";
+const PRODUCTS_ENDPOINT = "/products";
 const UPDATE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/updateOne/${id}`;
 const DELETE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/deleteOne/${id}`;
 
@@ -12,6 +13,8 @@ const getStrapiBaseURL = () => {
   if (!baseURL) return "";
   return baseURL.replace(/\/?api\/?$/, "");
 };
+
+
 
 const toAbsoluteUrl = (url) => {
   if (!url || typeof url !== "string") return null;
@@ -133,6 +136,7 @@ const unwrapInventoryResponse = (payload) => {
 export async function fetchInventoryItems() {
   try {
     const response = await api.get(INVENTORY_ENDPOINT);
+    const products = await api.get(PRODUCTS_ENDPOINT);
 
     const rawItems = unwrapInventoryResponse(response?.data);
     return rawItems

@@ -54,9 +54,6 @@ const normalizeProduct = (entry) => {
 export async function fetchProducts() {
   try {
     const response = await api.get(PRODUCTS_ENDPOINT, {
-      params: {
-        populate: "*",
-      },
     });
 
     const rawItems = unwrapProductsResponse(response?.data);
