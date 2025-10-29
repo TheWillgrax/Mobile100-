@@ -38,12 +38,24 @@ const expoConfigBaseURL =
   Constants?.manifest2?.extra?.expoClient?.extra?.API_URL ??
   null;
 
+const expoConfigToken =
+  Constants?.expoConfig?.extra?.API_TOKEN ??
+  Constants?.easConfig?.extra?.API_TOKEN ??
+  Constants?.manifest?.extra?.API_TOKEN ??
+  Constants?.manifest2?.extra?.expoClient?.extra?.API_TOKEN ??
+  null;
+
 const baseURL = process.env.EXPO_PUBLIC_API_URL || expoConfigBaseURL || fallbackBaseURL;
+const defaultToken = process.env.EXPO_PUBLIC_API_TOKEN || expoConfigToken || null;
 
 export const api = axios.create({
   baseURL,
   timeout: 10000,
 });
+
+if (defaultToken) {
+  api.defaults.headers.common.Authorization = `Bearer ${defaultToken}`;
+}
 
 export const setApiAuthToken = (token) => {
   if (token) {
