@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import InventoryCard from "../../components/InventoryCard";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -9,6 +18,7 @@ import { fetchInventoryItems } from "../../services/inventory";
 
 const InventoryScreen = () => {
   const { theme } = useTheme();
+  const router = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [inventory, setInventory] = useState([]);
@@ -62,7 +72,17 @@ const InventoryScreen = () => {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>Inventario en tiempo real</Text>
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>Inventario en tiempo real</Text>
+              <TouchableOpacity
+                onPress={() => router.push("/inventory/new")}
+                style={styles.newButton}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="add" size={18} color={theme.white} style={styles.newButtonIcon} />
+                <Text style={styles.newButtonLabel}>Nuevo inventario</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.subtitle}>
               Visualiza las existencias actuales de autopartes directamente desde Strapi.
             </Text>
@@ -90,11 +110,38 @@ const createStyles = (theme) =>
       paddingHorizontal: 16,
       paddingVertical: 12,
     },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
     title: {
       fontSize: 22,
       fontWeight: "700",
       color: theme.text,
       marginBottom: 4,
+    },
+    newButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.primary,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    newButtonIcon: {
+      marginRight: 6,
+    },
+    newButtonLabel: {
+      color: theme.white,
+      fontSize: 14,
+      fontWeight: "600",
     },
     subtitle: {
       fontSize: 14,
