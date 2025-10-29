@@ -16,7 +16,7 @@ const getStrapiBaseURL = () => {
 
 
 
-const toAbsoluteUrl = (url) => {
+const toAbsoluteUrl = (url) => { 
   if (!url || typeof url !== "string") return null;
   if (/^https?:\/\//i.test(url)) return url;
   const baseURL = getStrapiBaseURL();
