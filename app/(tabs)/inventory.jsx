@@ -67,6 +67,7 @@ const InventoryScreen = () => {
           sku: item.sku ?? "",
           vendor: item.vendor ?? "",
           quantity: item.stock ?? "",
+          name: item.name ?? "",
         },
       });
     },
@@ -87,8 +88,21 @@ const InventoryScreen = () => {
             style: "destructive",
             onPress: async () => {
               try {
-                await deleteInventoryRecord(item.id);
-                setInventory((prev) => prev.filter((entry) => entry.id !== item.id));
+                const parsedStock = Number(item.stock);
+                const quantityToRemove =
+                  Number.isFinite(parsedStock) && parsedStock > 0 ? parsedStock : 1;
+
+                const updated = await deleteInventoryRecord(item.id, quantityToRemove);
+
+                setInventory((prev) => {
+                  if (!updated || !Number.isFinite(updated?.stock) || updated.stock <= 0) {
+                    return prev.filter((entry) => entry.id !== item.id);
+                  }
+
+                  return prev.map((entry) =>
+                    entry.id === item.id ? { ...entry, stock: updated.stock } : entry
+                  );
+                });
               } catch (err) {
                 Alert.alert(
                   "No se pudo eliminar",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,11 +12,9 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import ProductPicker from "../../components/ProductPicker";
 import SafeScreen from "../../components/SafeScreen";
 import { useTheme } from "../../hooks/theme";
 import { updateInventoryRecord } from "../../services/inventory";
-import { fetchProducts } from "../../services/products";
 
 const coerceParam = (value) => {
   if (Array.isArray(value)) return value[0];
@@ -31,57 +29,31 @@ const InventoryEditScreen = () => {
 
   const inventoryId = coerceParam(params.id);
   const initialProductId = coerceParam(params.productId);
+  const initialProductName = coerceParam(params.name) ?? "";
   const initialSku = coerceParam(params.sku) ?? coerceParam(params.code) ?? "";
   const initialVendor = coerceParam(params.vendor) ?? "";
   const initialQuantity = coerceParam(params.quantity) ?? coerceParam(params.stock) ?? "";
 
-  const [products, setProducts] = useState([]);
-  const [productsError, setProductsError] = useState(null);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState(initialProductId);
-  const [productCode, setProductCode] = useState(initialSku);
-  const [quantity, setQuantity] = useState(initialQuantity ? `${initialQuantity}` : "");
-  const [vendor, setVendor] = useState(initialVendor);
+  const parsedInitialQuantity = Number(initialQuantity);
+  const startingQuantity =
+    Number.isFinite(parsedInitialQuantity) && parsedInitialQuantity >= 0
+      ? parsedInitialQuantity
+      : 0;
+
+  const [quantity, setQuantity] = useState(`${startingQuantity}`);
+  const [currentStock, setCurrentStock] = useState(startingQuantity);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const loadProducts = async () => {
-      setLoadingProducts(true);
-      try {
-        const items = await fetchProducts();
-        setProducts(items);
-        setProductsError(null);
-      } catch (err) {
-        console.error("Failed to load products", err);
-        setProducts([]);
-        setProductsError(err?.message ?? "No se pudieron cargar los productos.");
-      } finally {
-        setLoadingProducts(false);
-      }
-    };
-
-    loadProducts();
-  }, []);
-
-  const handleSelectProduct = (product) => {
-    setSelectedProductId(product?.id ?? null);
-    setProductCode(product?.code ?? "");
-    setVendor(product?.vendorCode ?? "");
-    setError(null);
-  };
 
   const handleSubmit = async () => {
     if (submitting) return;
 
-    const trimmedQuantity = `${quantity}`.trim();
-    const trimmedVendor = `${vendor}`.trim();
-    const trimmedCode = `${productCode}`.trim();
-
-    if (!selectedProductId) {
-      setError("Debes seleccionar un producto existente.");
+    if (!inventoryId) {
+      setError("No se pudo identificar el inventario a actualizar.");
       return;
     }
+
+    const trimmedQuantity = `${quantity}`.trim();
 
     if (!trimmedQuantity) {
       setError("La cantidad es obligatoria.");
@@ -94,22 +66,29 @@ const InventoryEditScreen = () => {
       return;
     }
 
+    const parsedCurrentStock = Number(currentStock);
+    const current = Number.isFinite(parsedCurrentStock) ? parsedCurrentStock : 0;
+    const difference = parsedQuantity - current;
+
+    if (difference === 0) {
+      setError("Debes ingresar una cantidad diferente al inventario actual.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
     try {
+      const action = difference > 0 ? "add" : "remove";
+      const payloadQuantity = Math.abs(difference);
+
       await updateInventoryRecord(inventoryId, {
-        productId: selectedProductId,
-        product:
-          trimmedCode || trimmedVendor
-            ? {
-                code: trimmedCode || undefined,
-                vendorCode: trimmedVendor || undefined,
-              }
-            : undefined,
-        quantity: parsedQuantity,
-        vendor: trimmedVendor || undefined,
+        quantity: payloadQuantity,
+        action,
       });
+
+      setCurrentStock(parsedQuantity);
+      setQuantity(`${parsedQuantity}`);
 
       Alert.alert(
         "Inventario actualizado",
@@ -149,56 +128,34 @@ const InventoryEditScreen = () => {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Producto *</Text>
-            <ProductPicker
-              products={products}
-              selectedProductId={selectedProductId}
-              onSelect={handleSelectProduct}
-              placeholder={
-                loadingProducts
-                  ? "Cargando productos..."
-                  : "Selecciona un producto"
-              }
-              disabled={submitting || loadingProducts}
-            />
-            {productsError ? <Text style={styles.helperText}>{productsError}</Text> : null}
+            <Text style={styles.label}>Producto</Text>
+            <View style={styles.readonlyField}>
+              <Text style={styles.readonlyText} numberOfLines={2}>
+                {initialProductName || initialProductId || "Producto sin nombre"}
+              </Text>
+              {initialSku ? (
+                <Text style={styles.helperText}>SKU: {initialSku}</Text>
+              ) : null}
+              {initialVendor ? (
+                <Text style={styles.helperText}>Proveedor: {initialVendor}</Text>
+              ) : null}
+            </View>
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Código o SKU</Text>
-            <TextInput
-              value={productCode}
-              onChangeText={setProductCode}
-              placeholder="Ej. SKU-12345"
-              style={styles.input}
-              placeholderTextColor={theme.textLight}
-              autoCapitalize="characters"
-              editable={!submitting}
-            />
+            <Text style={styles.label}>Inventario actual</Text>
+            <Text style={styles.currentStockText}>{currentStock}</Text>
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Cantidad *</Text>
+            <Text style={styles.label}>Nuevo inventario *</Text>
             <TextInput
               value={quantity}
               onChangeText={setQuantity}
-              placeholder="Ej. 25"
+              placeholder="Ingresa la cantidad final"
               style={styles.input}
               placeholderTextColor={theme.textLight}
               keyboardType="numeric"
-              editable={!submitting}
-            />
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Proveedor</Text>
-            <TextInput
-              value={vendor}
-              onChangeText={setVendor}
-              placeholder="Ej. Proveedor ABC"
-              style={styles.input}
-              placeholderTextColor={theme.textLight}
-              autoCapitalize="words"
               editable={!submitting}
             />
           </View>
@@ -260,6 +217,20 @@ const createStyles = (theme) =>
       fontWeight: "600",
       color: theme.text,
     },
+    readonlyField: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.card,
+      gap: 4,
+    },
+    readonlyText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.text,
+    },
     input: {
       borderWidth: 1,
       borderColor: theme.border,
@@ -269,6 +240,11 @@ const createStyles = (theme) =>
       fontSize: 16,
       color: theme.text,
       backgroundColor: theme.card,
+    },
+    currentStockText: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.primary,
     },
     errorText: {
       color: theme.danger,
