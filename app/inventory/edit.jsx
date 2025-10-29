@@ -10,26 +10,38 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
+import ProductPicker from "../../components/ProductPicker";
 import SafeScreen from "../../components/SafeScreen";
 import { useTheme } from "../../hooks/theme";
-import ProductPicker from "../../components/ProductPicker";
-import { createInventoryRecord } from "../../services/inventory";
+import { updateInventoryRecord } from "../../services/inventory";
 import { fetchProducts } from "../../services/products";
 
-const NewInventoryScreen = () => {
-  const { theme } = useTheme();
+const coerceParam = (value) => {
+  if (Array.isArray(value)) return value[0];
+  return value ?? null;
+};
+
+const InventoryEditScreen = () => {
+  const params = useLocalSearchParams();
   const router = useRouter();
+  const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const inventoryId = coerceParam(params.id);
+  const initialProductId = coerceParam(params.productId);
+  const initialSku = coerceParam(params.sku) ?? coerceParam(params.code) ?? "";
+  const initialVendor = coerceParam(params.vendor) ?? "";
+  const initialQuantity = coerceParam(params.quantity) ?? coerceParam(params.stock) ?? "";
 
   const [products, setProducts] = useState([]);
   const [productsError, setProductsError] = useState(null);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState(null);
-  const [productCode, setProductCode] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [vendor, setVendor] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState(initialProductId);
+  const [productCode, setProductCode] = useState(initialSku);
+  const [quantity, setQuantity] = useState(initialQuantity ? `${initialQuantity}` : "");
+  const [vendor, setVendor] = useState(initialVendor);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -52,13 +64,6 @@ const NewInventoryScreen = () => {
     loadProducts();
   }, []);
 
-  const resetForm = () => {
-    setSelectedProductId(null);
-    setProductCode("");
-    setQuantity("");
-    setVendor("");
-  };
-
   const handleSelectProduct = (product) => {
     setSelectedProductId(product?.id ?? null);
     setProductCode(product?.code ?? "");
@@ -66,16 +71,12 @@ const NewInventoryScreen = () => {
     setError(null);
   };
 
-  const handleSuccessNavigation = () => {
-    router.replace("/(tabs)/inventory");
-  };
-
   const handleSubmit = async () => {
     if (submitting) return;
 
-    const trimmedQuantity = quantity.trim();
-    const trimmedVendor = vendor.trim();
-    const trimmedCode = productCode.trim();
+    const trimmedQuantity = `${quantity}`.trim();
+    const trimmedVendor = `${vendor}`.trim();
+    const trimmedCode = `${productCode}`.trim();
 
     if (!selectedProductId) {
       setError("Debes seleccionar un producto existente.");
@@ -97,7 +98,7 @@ const NewInventoryScreen = () => {
     setError(null);
 
     try {
-      await createInventoryRecord({
+      await updateInventoryRecord(inventoryId, {
         productId: selectedProductId,
         product:
           trimmedCode || trimmedVendor
@@ -110,21 +111,19 @@ const NewInventoryScreen = () => {
         vendor: trimmedVendor || undefined,
       });
 
-      resetForm();
-
       Alert.alert(
-        "Inventario creado",
-        "El nuevo inventario se registró correctamente.",
+        "Inventario actualizado",
+        "El inventario se guardó correctamente.",
         [
           {
-            text: "Volver al inventario",
-            onPress: handleSuccessNavigation,
+            text: "Volver",
+            onPress: () => router.back(),
           },
         ],
         { cancelable: false }
       );
     } catch (err) {
-      setError(err?.message ?? "No se pudo crear el inventario.");
+      setError(err?.message ?? "No se pudo actualizar el inventario.");
     } finally {
       setSubmitting(false);
     }
@@ -143,22 +142,14 @@ const NewInventoryScreen = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Text style={styles.title}>Nuevo inventario</Text>
+            <Text style={styles.title}>Editar inventario</Text>
             <Text style={styles.description}>
-              Registra un nuevo lote de inventario proporcionando la información del producto.
+              Actualiza los detalles del inventario seleccionado.
             </Text>
           </View>
 
           <View style={styles.fieldGroup}>
-            <View style={styles.fieldLabelRow}>
-              <Text style={styles.label}>Producto *</Text>
-              <TouchableOpacity
-                onPress={() => router.push("/products/new")}
-                disabled={submitting}
-              >
-                <Text style={styles.linkLabel}>Crear producto</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.label}>Producto *</Text>
             <ProductPicker
               products={products}
               selectedProductId={selectedProductId}
@@ -170,9 +161,7 @@ const NewInventoryScreen = () => {
               }
               disabled={submitting || loadingProducts}
             />
-            {productsError ? (
-              <Text style={styles.helperText}>{productsError}</Text>
-            ) : null}
+            {productsError ? <Text style={styles.helperText}>{productsError}</Text> : null}
           </View>
 
           <View style={styles.fieldGroup}>
@@ -223,7 +212,7 @@ const NewInventoryScreen = () => {
             disabled={submitting}
           >
             <Text style={styles.primaryButtonLabel}>
-              {submitting ? "Guardando..." : "Crear inventario"}
+              {submitting ? "Guardando..." : "Guardar cambios"}
             </Text>
           </TouchableOpacity>
 
@@ -265,16 +254,6 @@ const createStyles = (theme) =>
     },
     fieldGroup: {
       gap: 8,
-    },
-    fieldLabelRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-    },
-    linkLabel: {
-      color: theme.primary,
-      fontWeight: "600",
-      fontSize: 14,
     },
     label: {
       fontSize: 14,
@@ -334,4 +313,4 @@ const createStyles = (theme) =>
     },
   });
 
-export default NewInventoryScreen;
+export default InventoryEditScreen;
