@@ -4,6 +4,19 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { storage } from "./storage";
 
+const extractHostname = (uri) => {
+  if (!uri) return null;
+
+  try {
+    const parsed = new URL(uri.includes("://") ? uri : `http://${uri}`);
+    return parsed.hostname || null;
+  } catch (error) {
+    // Fallback para valores inesperados como "exp://192.168.x.x:8081"
+    const sanitized = uri.replace(/^\w+:\/\//, "");
+    return sanitized.split(":")[0] ?? null;
+  }
+};
+
 const resolveExpoHost = () => {
   const hostUri =
     Constants?.expoConfig?.hostUri ??
@@ -11,10 +24,8 @@ const resolveExpoHost = () => {
     Constants?.manifest2?.extra?.expoClient?.hostUri ??
     null;
 
-  if (!hostUri) return null;
-
-  const host = hostUri.split(":")[0];
-  return host ? `http://${host}:1337/api` : null;
+  const hostname = extractHostname(hostUri);
+  return hostname ? `http://${hostname}:1337/api` : null;
 };
 
 const fallbackBaseURL = resolveExpoHost() ??
