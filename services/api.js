@@ -4,10 +4,21 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { storage } from "./storage";
 
-const fallbackBaseURL =
-  Platform.OS === "android"
-    ? "http://192.168.68.55:1337/api"   // emulador Android
-    : "http://localhost:1337/api"; // web / iOS simulador
+const resolveExpoHost = () => {
+  const hostUri =
+    Constants?.expoConfig?.hostUri ??
+    Constants?.manifest?.hostUri ??
+    Constants?.manifest2?.extra?.expoClient?.hostUri ??
+    null;
+
+  if (!hostUri) return null;
+
+  const host = hostUri.split(":")[0];
+  return host ? `http://${host}:1337/api` : null;
+};
+
+const fallbackBaseURL = resolveExpoHost() ??
+  (Platform.OS === "android" ? "http://10.0.2.2:1337/api" : "http://localhost:1337/api");
 
 const expoConfigBaseURL =
   Constants?.expoConfig?.extra?.API_URL ??
@@ -16,10 +27,20 @@ const expoConfigBaseURL =
   Constants?.manifest2?.extra?.expoClient?.extra?.API_URL ??
   null;
 
+const baseURL = process.env.EXPO_PUBLIC_API_URL || expoConfigBaseURL || fallbackBaseURL;
+
 export const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL || expoConfigBaseURL || fallbackBaseURL,
+  baseURL,
   timeout: 10000,
 });
+
+export const setApiAuthToken = (token) => {
+  if (token) {
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common.Authorization;
+  }
+};
 
 api.interceptors.request.use(async (config = {}) => {
   try {

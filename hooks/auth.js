@@ -6,6 +6,7 @@ import {
   signOut as signOutRequest,
   updateProfile as updateProfileRequest,
 } from "../services/auth";
+import { setApiAuthToken } from "../services/api";
 import { storage } from "../services/storage";
 
 const AuthContext = createContext(null);
@@ -33,7 +34,12 @@ export function AuthProvider({ children }) {
             setSession({ token, user: parsedUser });
           } catch {
             setSession({ token, user: null });
+          } finally {
+            setApiAuthToken(token);
           }
+        } else if (token) {
+          setSession({ token, user: null });
+          setApiAuthToken(token);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -48,11 +54,13 @@ export function AuthProvider({ children }) {
   const signIn = useCallback(async (identifier, password) => {
     const { jwt, user } = await signInRequest(identifier, password);
     setSession({ token: jwt, user });
+    setApiAuthToken(jwt);
   }, []);
 
   const signOut = useCallback(async () => {
     await signOutRequest();
     setSession(null);
+    setApiAuthToken(null);
   }, []);
 
   const updateProfile = useCallback(async (updates = {}) => {
