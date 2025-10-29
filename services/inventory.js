@@ -3,6 +3,9 @@ import { api } from "./api";
 
 const INVENTORY_ENDPOINT = "/bulkloadinventory/all";
 const CREATE_INVENTORY_ENDPOINT = "/bulkloadinventory/createOne";
+const INVENTORY_BASE_ENDPOINT = "/bulkloadinventory";
+const UPDATE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/updateOne/${id}`;
+const DELETE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/deleteOne/${id}`;
 
 const getStrapiBaseURL = () => {
   const baseURL = api.defaults?.baseURL ?? "";
@@ -66,6 +69,14 @@ const normalizeInventoryItem = (item) => {
   if (!item) return null;
 
   const product = item.product ?? {};
+  const productId =
+    product.id ??
+    product.documentId ??
+    item.productId ??
+    item.product_id ??
+    (typeof item.product === "string" || typeof item.product === "number"
+      ? item.product
+      : null);
 
   const price =
     parseNumber(product.salePrice) ??
@@ -105,6 +116,7 @@ const normalizeInventoryItem = (item) => {
     status,
     statusLabel: formatInventoryStatus(status),
     image: toAbsoluteUrl(imageCandidate),
+    productId,
   };
 };
 
@@ -138,15 +150,34 @@ export async function fetchInventoryItems() {
   }
 }
 
-export async function createInventoryRecord({ product, quantity, vendor }) {
-  try {
-    const payload = {
-      product,
-      quantity,
-      vendor,
-    };
+const buildInventoryPayload = ({ productId, product, quantity, vendor }) => {
+  const payload = {};
 
-    const response = await api.post(CREATE_INVENTORY_ENDPOINT, payload);
+  if (productId) {
+    payload.productId = productId;
+  }
+
+  if (product) {
+    payload.product = product;
+  }
+
+  if (quantity !== undefined) {
+    payload.quantity = quantity;
+  }
+
+  if (vendor !== undefined) {
+    payload.vendor = vendor;
+  }
+
+  return payload;
+};
+
+export async function createInventoryRecord({ productId, product, quantity, vendor }) {
+  try {
+    const response = await api.post(
+      CREATE_INVENTORY_ENDPOINT,
+      buildInventoryPayload({ productId, product, quantity, vendor })
+    );
 
     const createdItem =
       response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
@@ -158,6 +189,52 @@ export async function createInventoryRecord({ product, quantity, vendor }) {
       error?.friendlyMessage ||
         error?.message ||
         "No se pudo crear el registro de inventario."
+    );
+    err.cause = error;
+    throw err;
+  }
+}
+
+export async function updateInventoryRecord(id, { productId, product, quantity, vendor }) {
+  if (!id) {
+    throw new Error("El identificador del inventario es obligatorio.");
+  }
+
+  try {
+    const response = await api.put(
+      UPDATE_INVENTORY_ENDPOINT(id),
+      buildInventoryPayload({ productId, product, quantity, vendor })
+    );
+
+    const updatedItem =
+      response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
+
+    return normalizeInventoryItem(updatedItem);
+  } catch (error) {
+    console.error("Error updating inventory record:", error);
+    const err = new Error(
+      error?.friendlyMessage ||
+        error?.message ||
+        "No se pudo actualizar el registro de inventario."
+    );
+    err.cause = error;
+    throw err;
+  }
+}
+
+export async function deleteInventoryRecord(id) {
+  if (!id) {
+    throw new Error("El identificador del inventario es obligatorio.");
+  }
+
+  try {
+    await api.delete(DELETE_INVENTORY_ENDPOINT(id));
+  } catch (error) {
+    console.error("Error deleting inventory record:", error);
+    const err = new Error(
+      error?.friendlyMessage ||
+        error?.message ||
+        "No se pudo eliminar el registro de inventario."
     );
     err.cause = error;
     throw err;

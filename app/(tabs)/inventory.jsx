@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -8,13 +9,16 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import InventoryCard from "../../components/InventoryCard";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import SafeScreen from "../../components/SafeScreen";
 import { useTheme } from "../../hooks/theme";
-import { fetchInventoryItems } from "../../services/inventory";
+import {
+  deleteInventoryRecord,
+  fetchInventoryItems,
+} from "../../services/inventory";
 
 const InventoryScreen = () => {
   const { theme } = useTheme();
@@ -41,16 +45,70 @@ const InventoryScreen = () => {
     }
   }, []);
 
-  useEffect(() => {
-    loadInventory();
-  }, [loadInventory]);
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      loadInventory();
+    }, [loadInventory])
+  );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadInventory();
   }, [loadInventory]);
 
-  const renderItem = useCallback(({ item }) => <InventoryCard item={item} />, []);
+  const handleEditItem = useCallback(
+    (item) => {
+      router.push({
+        pathname: "/inventory/edit",
+        params: {
+          id: item.id,
+          productId: item.productId ?? "",
+          sku: item.sku ?? "",
+          vendor: item.vendor ?? "",
+          quantity: item.stock ?? "",
+        },
+      });
+    },
+    [router]
+  );
+
+  const handleDeleteItem = useCallback(
+    (item) => {
+      if (!item?.id) return;
+
+      Alert.alert(
+        "Eliminar inventario",
+        `¿Deseas eliminar el inventario de ${item.name}?`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Eliminar",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await deleteInventoryRecord(item.id);
+                setInventory((prev) => prev.filter((entry) => entry.id !== item.id));
+              } catch (err) {
+                Alert.alert(
+                  "No se pudo eliminar",
+                  err?.message ?? "Ocurrió un error al eliminar el inventario."
+                );
+              }
+            },
+          },
+        ]
+      );
+    },
+    []
+  );
+
+  const renderItem = useCallback(
+    ({ item }) => (
+      <InventoryCard item={item} onEdit={() => handleEditItem(item)} onDelete={() => handleDeleteItem(item)} />
+    ),
+    [handleDeleteItem, handleEditItem]
+  );
 
   if (loading && !refreshing) {
     return <LoadingSpinner message="Cargando inventario real..." />;
@@ -74,14 +132,34 @@ const InventoryScreen = () => {
           <View style={styles.header}>
             <View style={styles.headerRow}>
               <Text style={styles.title}>Inventario en tiempo real</Text>
-              <TouchableOpacity
-                onPress={() => router.push("/inventory/new")}
-                style={styles.newButton}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="add" size={18} color={theme.white} style={styles.newButtonIcon} />
-                <Text style={styles.newButtonLabel}>Nuevo inventario</Text>
-              </TouchableOpacity>
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  onPress={() => router.push("/products")}
+                  style={[styles.newButton, styles.secondaryActionButton]}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons
+                    name="cube"
+                    size={16}
+                    color={theme.primary}
+                    style={styles.newButtonIcon}
+                  />
+                  <Text style={styles.secondaryActionLabel}>Productos</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push("/inventory/new")}
+                  style={styles.newButton}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons
+                    name="add"
+                    size={18}
+                    color={theme.white}
+                    style={styles.newButtonIcon}
+                  />
+                  <Text style={styles.newButtonLabel}>Nuevo inventario</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             <Text style={styles.subtitle}>
               Visualiza las existencias actuales de autopartes directamente desde Strapi.
@@ -116,6 +194,11 @@ const createStyles = (theme) =>
       justifyContent: "space-between",
       gap: 12,
     },
+    headerActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
     title: {
       fontSize: 22,
       fontWeight: "700",
@@ -135,11 +218,21 @@ const createStyles = (theme) =>
       shadowRadius: 4,
       elevation: 2,
     },
+    secondaryActionButton: {
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
     newButtonIcon: {
       marginRight: 6,
     },
     newButtonLabel: {
       color: theme.white,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    secondaryActionLabel: {
+      color: theme.primary,
       fontSize: 14,
       fontWeight: "600",
     },

@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -16,58 +15,56 @@ const formatCurrency = (value) => {
   return `$${formatted}`;
 };
 
-export default function InventoryCard({ item, onEdit, onDelete }) {
+const buildPriceLabel = (item) => {
+  const prices = [
+    item.salePrice ? `Venta: ${formatCurrency(item.salePrice)}` : null,
+    item.wholesalePrice ? `Mayoreo: ${formatCurrency(item.wholesalePrice)}` : null,
+    item.retailPrice ? `Menudeo: ${formatCurrency(item.retailPrice)}` : null,
+  ].filter(Boolean);
+
+  return prices.length > 0 ? prices.join(" · ") : null;
+};
+
+const ProductCard = ({ item, onEdit, onDelete }) => {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const metaItems = useMemo(
-    () =>
-      [
-        item?.sku ? `SKU: ${item.sku}` : null,
-        item?.vendor ? `Proveedor: ${item.vendor}` : null,
-        item?.statusLabel || item?.status
-          ? `Estado: ${item.statusLabel ?? item.status}`
-          : null,
-        item?.type ? `Tipo: ${item.type}` : null,
-      ].filter(Boolean),
-    [item]
-  );
+  const priceLabel = useMemo(() => buildPriceLabel(item), [item]);
 
   return (
     <View style={styles.card}>
-      {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.image} contentFit="cover" />
-      ) : (
-        <View style={styles.placeholder}>
-          <Ionicons name="cube-outline" size={36} color={theme.textLight} />
-        </View>
-      )}
+      <View style={styles.iconWrapper}>
+        <Ionicons name="cube" size={32} color={theme.primary} />
+      </View>
 
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={2}>
           {item.name}
         </Text>
 
-        {metaItems.length > 0 && (
-          <View style={styles.metaRow}>
-            {metaItems.map((text, index) => (
-              <Text key={index} style={styles.meta} numberOfLines={1}>
-                {text}
-              </Text>
-            ))}
-          </View>
-        )}
-
-        <View style={styles.infoRow}>
-          <Text style={styles.stock} numberOfLines={1}>
-            Stock: {item.stock ?? "N/D"}
-          </Text>
-          {!!item.price && (
-            <Text style={styles.price} numberOfLines={1}>
-              {formatCurrency(item.price)}
+        <View style={styles.metaRow}>
+          {item.code ? (
+            <Text style={styles.meta} numberOfLines={1}>
+              SKU: {item.code}
             </Text>
-          )}
+          ) : null}
+          {item.vendorCode ? (
+            <Text style={styles.meta} numberOfLines={1}>
+              Proveedor: {item.vendorCode}
+            </Text>
+          ) : null}
+          {item.type ? (
+            <Text style={styles.meta} numberOfLines={1}>
+              Tipo: {item.type}
+            </Text>
+          ) : null}
         </View>
+
+        {priceLabel ? (
+          <Text style={styles.priceLabel} numberOfLines={1}>
+            {priceLabel}
+          </Text>
+        ) : null}
 
         {!!item.description && (
           <Text style={styles.description} numberOfLines={2}>
@@ -112,7 +109,7 @@ export default function InventoryCard({ item, onEdit, onDelete }) {
       </View>
     </View>
   );
-}
+};
 
 const createStyles = (theme) =>
   StyleSheet.create({
@@ -129,27 +126,21 @@ const createStyles = (theme) =>
       shadowRadius: 8,
       elevation: 2,
     },
-    image: {
-      width: 92,
-      height: 92,
+    iconWrapper: {
+      width: 64,
+      height: 64,
       borderRadius: 12,
-      backgroundColor: theme.surface,
-      marginRight: 12,
-    },
-    placeholder: {
-      width: 92,
-      height: 92,
-      borderRadius: 12,
-      marginRight: 12,
-      backgroundColor: theme.surface,
+      backgroundColor: theme.surface ?? theme.background,
       alignItems: "center",
       justifyContent: "center",
+      marginRight: 12,
     },
     content: {
       flex: 1,
+      gap: 6,
     },
     title: {
-      fontSize: responsiveFontSize(15),
+      fontSize: responsiveFontSize(16),
       fontWeight: "600",
       color: theme.text,
     },
@@ -157,35 +148,22 @@ const createStyles = (theme) =>
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 8,
-      marginTop: 4,
     },
     meta: {
       color: theme.textLight,
       fontSize: responsiveFontSize(12),
     },
-    infoRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginTop: 6,
-    },
-    stock: {
-      fontWeight: "500",
+    priceLabel: {
+      fontSize: responsiveFontSize(12),
       color: theme.primary,
-      fontSize: responsiveFontSize(13),
-    },
-    price: {
       fontWeight: "600",
-      color: theme.success ?? theme.primary,
-      fontSize: responsiveFontSize(13),
     },
     description: {
-      marginTop: 6,
       fontSize: responsiveFontSize(12),
       color: theme.textLight,
     },
     actionsRow: {
-      marginTop: 12,
+      marginTop: 8,
       flexDirection: "row",
       gap: 12,
     },
@@ -214,5 +192,6 @@ const createStyles = (theme) =>
     deleteLabel: {
       color: theme.danger,
     },
-  });
+});
 
+export default ProductCard;
