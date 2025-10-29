@@ -13,10 +13,15 @@ export const api = axios.create({
   timeout: 10000,
 });
 
-api.interceptors.request.use(async (config) => {
+api.interceptors.request.use(async (config = {}) => {
   try {
     const token = await storage.get("token");
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      config.headers = config.headers ?? {};
+      if (!config.headers.Authorization) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
   } catch {}
   return config;
 });
