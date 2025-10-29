@@ -1,12 +1,11 @@
 // services/inventory.js
 import { api } from "./api";
+import { fetchProducts } from "./products";
 
 const INVENTORY_ENDPOINT = "/bulkloadinventory/all";
 const CREATE_INVENTORY_ENDPOINT = "/bulkloadinventory/createOne";
 const INVENTORY_BASE_ENDPOINT = "/bulkloadinventory";
-const PRODUCTS_ENDPOINT = "/products";
-const UPDATE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/updateOne/${id}`;
-const DELETE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/deleteOne/${id}`;
+const UPDATE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/update/${id}`;
 
 const getStrapiBaseURL = () => {
   const baseURL = api.defaults?.baseURL ?? "";
@@ -16,7 +15,7 @@ const getStrapiBaseURL = () => {
 
 
 
-const toAbsoluteUrl = (url) => { 
+const toAbsoluteUrl = (url) => {
   if (!url || typeof url !== "string") return null;
   if (/^https?:\/\//i.test(url)) return url;
   const baseURL = getStrapiBaseURL();
@@ -29,6 +28,17 @@ const parseNumber = (value) => {
   if (value === null || value === undefined) return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+};
+
+const toKey = (value) => {
+  if (value === null || value === undefined) return null;
+  const key = `${value}`.trim();
+  return key.length > 0 ? key : null;
+};
+
+const toCodeKey = (value) => {
+  const key = toKey(value);
+  return key ? key.toLowerCase() : null;
 };
 
 const resolveMediaUrl = (value) => {
@@ -68,13 +78,91 @@ const formatInventoryStatus = (status) => {
   }
 };
 
-const normalizeInventoryItem = (item) => {
+const buildProductLookup = (products = []) => {
+  const lookup = new Map();
+
+  products.forEach((product) => {
+    const idKey = toKey(product?.id ?? product?.documentId);
+    if (idKey) {
+      lookup.set(`id:${idKey}`, product);
+    }
+
+    const documentKey = toKey(product?.documentId);
+    if (documentKey) {
+      lookup.set(`id:${documentKey}`, product);
+    }
+
+    const codeKey = toCodeKey(product?.code);
+    if (codeKey) {
+      lookup.set(`code:${codeKey}`, product);
+    }
+
+    const vendorKey = toCodeKey(product?.vendorCode);
+    if (vendorKey) {
+      lookup.set(`code:${vendorKey}`, product);
+    }
+  });
+
+  return lookup;
+};
+
+const findMatchingProduct = (item, lookup) => {
+  if (!lookup || lookup.size === 0 || !item) return null;
+
+  const rawProduct = item.product ?? {};
+
+  const candidateIds = [
+    rawProduct?.id,
+    rawProduct?.documentId,
+    rawProduct?.productId,
+    item.productId,
+    item.product_id,
+    typeof item.product === "string" || typeof item.product === "number"
+      ? item.product
+      : null,
+  ];
+
+  for (const value of candidateIds) {
+    const key = toKey(value);
+    if (key && lookup.has(`id:${key}`)) {
+      return lookup.get(`id:${key}`);
+    }
+  }
+
+  const candidateCodes = [
+    rawProduct?.code,
+    rawProduct?.sku,
+    rawProduct?.productCode,
+    rawProduct?.product_code,
+    item.sku,
+    item.code,
+    item.productCode,
+    item.product_code,
+  ];
+
+  for (const value of candidateCodes) {
+    const key = toCodeKey(value);
+    if (key && lookup.has(`code:${key}`)) {
+      return lookup.get(`code:${key}`);
+    }
+  }
+
+  return null;
+};
+
+const normalizeInventoryItem = (item, productLookup) => {
   if (!item) return null;
 
-  const product = item.product ?? {};
+  const matchedProduct = findMatchingProduct(item, productLookup);
+  const product = {
+    ...(matchedProduct ?? {}),
+    ...(item.product ?? {}),
+  };
   const productId =
     product.id ??
     product.documentId ??
+    matchedProduct?.id ??
+    matchedProduct?.documentId ??
     item.productId ??
     item.product_id ??
     (typeof item.product === "string" || typeof item.product === "number"
@@ -92,6 +180,8 @@ const normalizeInventoryItem = (item) => {
     resolveMediaUrl(item.images) ??
     resolveMediaUrl(product.image) ??
     resolveMediaUrl(product.images) ??
+    resolveMediaUrl(matchedProduct?.image) ??
+    resolveMediaUrl(matchedProduct?.images) ??
     null;
 
   const status = item.stock_status ?? item.status ?? null;
@@ -103,19 +193,33 @@ const normalizeInventoryItem = (item) => {
       item.documentId ??
       product.documentId ??
       `${product.code ?? product.name ?? Math.random()}`,
-    name: product.name ?? item.name ?? "Producto sin nombre",
+    name:
+      product.name ??
+      matchedProduct?.name ??
+      item.name ??
+      "Producto sin nombre",
     sku:
       product.code ??
       product.vendorCode ??
       item.sku ??
       product.documentId ??
+      matchedProduct?.code ??
+      matchedProduct?.vendorCode ??
       null,
-    stock: parseNumber(item.quantity),
+    stock: parseNumber(
+      item.quantity ??
+        item.stock ??
+        item.available ??
+        item.inventory ??
+        item.total ??
+        item.amount
+    ),
     price,
-    description: product.description ?? item.description ?? null,
-    brand: product.vendorCode ?? null,
-    type: product.type ?? null,
-    vendor: item.vendor ?? null,
+    description:
+      product.description ?? matchedProduct?.description ?? item.description ?? null,
+    brand: product.vendorCode ?? matchedProduct?.vendorCode ?? null,
+    type: product.type ?? matchedProduct?.type ?? null,
+    vendor: item.vendor ?? product.vendor ?? matchedProduct?.vendor ?? null,
     status,
     statusLabel: formatInventoryStatus(status),
     image: toAbsoluteUrl(imageCandidate),
@@ -136,11 +240,20 @@ const unwrapInventoryResponse = (payload) => {
 export async function fetchInventoryItems() {
   try {
     const response = await api.get(INVENTORY_ENDPOINT);
-    const products = await api.get(PRODUCTS_ENDPOINT);
+    let products = [];
+
+    try {
+      products = await fetchProducts();
+    } catch (productError) {
+      console.warn("No se pudieron obtener los productos para el inventario", productError);
+      products = [];
+    }
+
+    const productLookup = buildProductLookup(products);
 
     const rawItems = unwrapInventoryResponse(response?.data);
     return rawItems
-      .map((item) => normalizeInventoryItem(item))
+      .map((item) => normalizeInventoryItem(item, productLookup))
       .filter((item) => item !== null);
   } catch (error) {
     console.error("Error fetching inventory:", error);
@@ -199,16 +312,29 @@ export async function createInventoryRecord({ productId, product, quantity, vend
   }
 }
 
-export async function updateInventoryRecord(id, { productId, product, quantity, vendor }) {
+const sanitizeAction = (action) => {
+  const normalized = `${action ?? ""}`.toLowerCase();
+  return normalized === "remove" ? "remove" : "add";
+};
+
+const ensurePositiveQuantity = (quantity) => {
+  const parsedQuantity = Number(quantity);
+  if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+    throw new Error("Ingresa una cantidad válida para actualizar el inventario.");
+  }
+  return parsedQuantity;
+};
+
+export async function updateInventoryRecord(id, { quantity, action }) {
   if (!id) {
     throw new Error("El identificador del inventario es obligatorio.");
   }
 
   try {
-    const response = await api.put(
-      UPDATE_INVENTORY_ENDPOINT(id),
-      buildInventoryPayload({ productId, product, quantity, vendor })
-    );
+    const response = await api.patch(UPDATE_INVENTORY_ENDPOINT(id), {
+      quantity: ensurePositiveQuantity(quantity),
+      action: sanitizeAction(action),
+    });
 
     const updatedItem =
       response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
@@ -226,13 +352,25 @@ export async function updateInventoryRecord(id, { productId, product, quantity, 
   }
 }
 
-export async function deleteInventoryRecord(id) {
+export async function deleteInventoryRecord(id, quantity) {
   if (!id) {
     throw new Error("El identificador del inventario es obligatorio.");
   }
 
   try {
-    await api.delete(DELETE_INVENTORY_ENDPOINT(id));
+    const fallbackQuantity = Number(quantity);
+    const sanitizedQuantity =
+      Number.isFinite(fallbackQuantity) && fallbackQuantity > 0 ? fallbackQuantity : 1;
+
+    const response = await api.patch(UPDATE_INVENTORY_ENDPOINT(id), {
+      quantity: ensurePositiveQuantity(sanitizedQuantity),
+      action: "remove",
+    });
+
+    const updatedItem =
+      response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
+
+    return normalizeInventoryItem(updatedItem);
   } catch (error) {
     console.error("Error deleting inventory record:", error);
     const err = new Error(
