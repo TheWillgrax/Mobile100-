@@ -1,10 +1,10 @@
 // services/inventory.js
 import { api } from "./api";
+import { fetchProducts } from "./products";
 
 const INVENTORY_ENDPOINT = "/bulkloadinventory/all";
 const CREATE_INVENTORY_ENDPOINT = "/bulkloadinventory/createOne";
 const INVENTORY_BASE_ENDPOINT = "/bulkloadinventory";
-const PRODUCTS_ENDPOINT = "/products";
 const UPDATE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/updateOne/${id}`;
 const DELETE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/deleteOne/${id}`;
 
@@ -68,13 +68,166 @@ const formatInventoryStatus = (status) => {
   }
 };
 
-const normalizeInventoryItem = (item) => {
+const extractProductData = (value) => {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  if (Array.isArray(value)) {
+    for (const candidate of value) {
+      const data = extractProductData(candidate);
+      if (Object.keys(data).length > 0) {
+        return data;
+      }
+    }
+    return {};
+  }
+
+  if (value.data) {
+    return extractProductData(value.data);
+  }
+
+  if (value.attributes) {
+    return {
+      ...value.attributes,
+      id: value.id ?? value.attributes?.id ?? null,
+      documentId:
+        value.attributes?.documentId ?? value.attributes?.document_id ?? null,
+    };
+  }
+
+  return { ...value };
+};
+
+const buildProductIndex = (products) => {
+  const index = {
+    byId: new Map(),
+    byDocumentId: new Map(),
+    byCode: new Map(),
+    byVendor: new Map(),
+  };
+
+  if (!Array.isArray(products)) {
+    return index;
+  }
+
+  for (const product of products) {
+    if (!product) continue;
+
+    const id = product.id ?? product.documentId ?? null;
+    if (id !== null && id !== undefined) {
+      index.byId.set(String(id), product);
+    }
+
+    if (product.documentId) {
+      index.byDocumentId.set(String(product.documentId), product);
+    }
+
+    if (product.code) {
+      index.byCode.set(String(product.code).toLowerCase(), product);
+    }
+
+    if (product.vendorCode) {
+      const vendorKey = String(product.vendorCode).trim().toLowerCase();
+      if (!vendorKey) continue;
+      if (!index.byVendor.has(vendorKey)) {
+        index.byVendor.set(vendorKey, []);
+      }
+      index.byVendor.get(vendorKey).push(product);
+    }
+  }
+
+  return index;
+};
+
+const toKey = (value) => {
+  if (value === null || value === undefined) return null;
+  const str = String(value).trim();
+  return str.length > 0 ? str : null;
+};
+
+const findProductMatch = (item, index) => {
+  if (!index) return null;
+
+  const rawProduct = extractProductData(item?.product);
+
+  const idCandidates = [
+    item?.productId,
+    item?.product_id,
+    rawProduct?.id,
+    rawProduct?.productId,
+    rawProduct?.product_id,
+  ];
+
+  for (const candidate of idCandidates) {
+    const key = toKey(candidate);
+    if (!key) continue;
+    const product = index.byId.get(key) ?? index.byDocumentId.get(key);
+    if (product) return product;
+  }
+
+  const documentCandidates = [
+    item?.productDocumentId,
+    item?.product_document_id,
+    rawProduct?.documentId,
+    rawProduct?.document_id,
+  ];
+
+  for (const candidate of documentCandidates) {
+    const key = toKey(candidate);
+    if (!key) continue;
+    const product = index.byDocumentId.get(key);
+    if (product) return product;
+  }
+
+  const codeCandidates = [
+    item?.sku,
+    item?.code,
+    item?.productCode,
+    item?.product_code,
+    rawProduct?.code,
+    rawProduct?.sku,
+    rawProduct?.productCode,
+    rawProduct?.product_code,
+  ];
+
+  for (const candidate of codeCandidates) {
+    const key = toKey(candidate);
+    if (!key) continue;
+    const product = index.byCode.get(key.toLowerCase());
+    if (product) return product;
+  }
+
+  const vendorCandidates = [
+    item?.vendor,
+    rawProduct?.vendor,
+    rawProduct?.vendorCode,
+    rawProduct?.vendor_code,
+  ];
+
+  for (const candidate of vendorCandidates) {
+    const key = toKey(candidate);
+    if (!key) continue;
+    const matches = index.byVendor.get(key.toLowerCase());
+    if (matches?.length === 1) {
+      return matches[0];
+    }
+  }
+
+  return null;
+};
+
+const normalizeInventoryItem = (item, productIndex) => {
   if (!item) return null;
 
-  const product = item.product ?? {};
+  const fallbackProduct = extractProductData(item.product);
+  const matchedProduct = findProductMatch(item, productIndex);
+  const product = { ...(matchedProduct ?? {}), ...(fallbackProduct ?? {}) };
+
   const productId =
     product.id ??
-    product.documentId ??
+    matchedProduct?.id ??
+    fallbackProduct?.id ??
     item.productId ??
     item.product_id ??
     (typeof item.product === "string" || typeof item.product === "number"
@@ -113,9 +266,9 @@ const normalizeInventoryItem = (item) => {
     stock: parseNumber(item.quantity),
     price,
     description: product.description ?? item.description ?? null,
-    brand: product.vendorCode ?? null,
+    brand: product.vendorCode ?? product.vendor ?? null,
     type: product.type ?? null,
-    vendor: item.vendor ?? null,
+    vendor: item.vendor ?? product.vendorCode ?? product.vendor ?? null,
     status,
     statusLabel: formatInventoryStatus(status),
     image: toAbsoluteUrl(imageCandidate),
@@ -135,12 +288,18 @@ const unwrapInventoryResponse = (payload) => {
 
 export async function fetchInventoryItems() {
   try {
-    const response = await api.get(INVENTORY_ENDPOINT);
-    const products = await api.get(PRODUCTS_ENDPOINT);
+    const [response, products] = await Promise.all([
+      api.get(INVENTORY_ENDPOINT),
+      fetchProducts().catch((error) => {
+        console.warn("Failed to fetch products for inventory merge", error);
+        return [];
+      }),
+    ]);
 
+    const productIndex = buildProductIndex(products);
     const rawItems = unwrapInventoryResponse(response?.data);
     return rawItems
-      .map((item) => normalizeInventoryItem(item))
+      .map((item) => normalizeInventoryItem(item, productIndex))
       .filter((item) => item !== null);
   } catch (error) {
     console.error("Error fetching inventory:", error);
