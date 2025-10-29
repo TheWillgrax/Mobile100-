@@ -1,5 +1,6 @@
 // services/api.js
 import axios from "axios";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { storage } from "./storage";
 
@@ -8,8 +9,15 @@ const fallbackBaseURL =
     ? "http://192.168.68.55:1337/api"   // emulador Android
     : "http://localhost:1337/api"; // web / iOS simulador
 
+const expoConfigBaseURL =
+  Constants?.expoConfig?.extra?.API_URL ??
+  Constants?.easConfig?.extra?.API_URL ??
+  Constants?.manifest?.extra?.API_URL ??
+  Constants?.manifest2?.extra?.expoClient?.extra?.API_URL ??
+  null;
+
 export const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL || fallbackBaseURL,
+  baseURL: process.env.EXPO_PUBLIC_API_URL || expoConfigBaseURL || fallbackBaseURL,
   timeout: 10000,
 });
 
