@@ -16,16 +16,6 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
-### Environment variables
-
-Create a `.env` file in the project root (or configure your preferred environment manager) with the following variable so the app can authenticate against the API:
-
-```bash
-EXPO_PUBLIC_API_AUTHORIZER=<tu_token_de_autorizador>
-```
-
-Replace `<tu_token_de_autorizador>` with the value proporcionado por tu instancia del backend.
-
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
