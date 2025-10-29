@@ -26,8 +26,133 @@ const toAbsoluteUrl = (url) => {
 
 const parseNumber = (value) => {
   if (value === null || value === undefined) return null;
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const direct = Number(trimmed);
+    if (Number.isFinite(direct)) return direct;
+
+    const numericMatch = trimmed.match(/-?\d+(?:[\.,]\d+)?/);
+    if (numericMatch) {
+      let normalized = numericMatch[0];
+      const hasComma = normalized.includes(",");
+      const hasDot = normalized.includes(".");
+
+      if (hasComma && hasDot) {
+        normalized = normalized.replace(/,/g, "");
+      } else if (hasComma) {
+        normalized = normalized.replace(/,/g, ".");
+      }
+
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    return null;
+  }
+
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+};
+
+const unwrapStrapiEntity = (value) => {
+  if (!value) return null;
+
+  if (typeof value !== "object") {
+    const key = `${value ?? ""}`.trim();
+    const normalized = key.length > 0 ? key : null;
+
+    return {
+      id: normalized,
+      documentId: normalized,
+      value,
+    };
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const unwrapped = unwrapStrapiEntity(entry);
+      if (unwrapped) return unwrapped;
+    }
+    return null;
+  }
+
+  if (value?.data) {
+    return unwrapStrapiEntity(value.data);
+  }
+
+  if (value?.attributes) {
+    const attributes = value.attributes ?? {};
+    return {
+      ...attributes,
+      id:
+        value.id ??
+        attributes.id ??
+        attributes.documentId ??
+        attributes.document_id ??
+        null,
+      documentId:
+        attributes.documentId ??
+        attributes.document_id ??
+        value.documentId ??
+        value.document_id ??
+        null,
+    };
+  }
+
+  return {
+    ...value,
+    id: value.id ?? value.documentId ?? value.document_id ?? null,
+    documentId: value.documentId ?? value.document_id ?? value.id ?? null,
+  };
+};
+
+const normalizeProductReference = (product) => {
+  if (!product) return null;
+
+  const unwrapped = unwrapStrapiEntity(product);
+  if (!unwrapped) return null;
+
+  const { value: _rawValue, ...rest } = unwrapped;
+
+  return {
+    ...rest,
+    id:
+      rest.id ??
+      rest.documentId ??
+      rest.document_id ??
+      rest.productId ??
+      rest.product_id ??
+      null,
+    documentId:
+      rest.documentId ??
+      rest.document_id ??
+      rest.id ??
+      null,
+    code:
+      rest.code ??
+      rest.sku ??
+      rest.productCode ??
+      rest.product_code ??
+      null,
+    vendorCode:
+      rest.vendorCode ??
+      rest.vendor_code ??
+      rest.vendor ??
+      null,
+    name:
+      rest.name ??
+      rest.productName ??
+      rest.title ??
+      rest.label ??
+      null,
+  };
 };
 
 const toKey = (value) => {
@@ -82,24 +207,27 @@ const buildProductLookup = (products = []) => {
   const lookup = new Map();
 
   products.forEach((product) => {
-    const idKey = toKey(product?.id ?? product?.documentId);
+    const normalized = normalizeProductReference(product);
+    if (!normalized) return;
+
+    const idKey = toKey(normalized?.id ?? normalized?.documentId);
     if (idKey) {
-      lookup.set(`id:${idKey}`, product);
+      lookup.set(`id:${idKey}`, normalized);
     }
 
-    const documentKey = toKey(product?.documentId);
+    const documentKey = toKey(normalized?.documentId);
     if (documentKey) {
-      lookup.set(`id:${documentKey}`, product);
+      lookup.set(`id:${documentKey}`, normalized);
     }
 
-    const codeKey = toCodeKey(product?.code);
+    const codeKey = toCodeKey(normalized?.code);
     if (codeKey) {
-      lookup.set(`code:${codeKey}`, product);
+      lookup.set(`code:${codeKey}`, normalized);
     }
 
-    const vendorKey = toCodeKey(product?.vendorCode);
+    const vendorKey = toCodeKey(normalized?.vendorCode);
     if (vendorKey) {
-      lookup.set(`code:${vendorKey}`, product);
+      lookup.set(`code:${vendorKey}`, normalized);
     }
   });
 
@@ -109,7 +237,7 @@ const buildProductLookup = (products = []) => {
 const findMatchingProduct = (item, lookup) => {
   if (!lookup || lookup.size === 0 || !item) return null;
 
-  const rawProduct = item.product ?? {};
+  const rawProduct = normalizeProductReference(item.product) ?? {};
 
   const candidateIds = [
     rawProduct?.id,
@@ -151,12 +279,13 @@ const findMatchingProduct = (item, lookup) => {
 };
 
 const normalizeInventoryItem = (item, productLookup) => {
-  if (!item) return null;
+  if (!item || typeof item !== "object") return null;
 
   const matchedProduct = findMatchingProduct(item, productLookup);
+  const rawProduct = normalizeProductReference(item.product) ?? {};
   const product = {
     ...(matchedProduct ?? {}),
-    ...(item.product ?? {}),
+    ...rawProduct,
   };
   const productId =
     product.id ??
@@ -186,6 +315,27 @@ const normalizeInventoryItem = (item, productLookup) => {
 
   const status = item.stock_status ?? item.status ?? null;
 
+  const quantityCandidates = [
+    item.quantity,
+    item.stock,
+    item.available,
+    item.inventory,
+    item.total,
+    item.amount,
+    rawProduct?.quantity,
+    rawProduct?.stock,
+    rawProduct?.available,
+  ];
+
+  let stock = null;
+  for (const candidate of quantityCandidates) {
+    const parsed = parseNumber(candidate);
+    if (parsed !== null) {
+      stock = parsed;
+      break;
+    }
+  }
+
   return {
     id:
       item.id ??
@@ -206,14 +356,7 @@ const normalizeInventoryItem = (item, productLookup) => {
       matchedProduct?.code ??
       matchedProduct?.vendorCode ??
       null,
-    stock: parseNumber(
-      item.quantity ??
-        item.stock ??
-        item.available ??
-        item.inventory ??
-        item.total ??
-        item.amount
-    ),
+    stock,
     price,
     description:
       product.description ?? matchedProduct?.description ?? item.description ?? null,
