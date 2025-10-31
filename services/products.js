@@ -2,6 +2,8 @@
 import { api } from "./api";
 
 const PRODUCTS_ENDPOINT = "/products";
+const UPDATE_PRODUCT_FALLBACK_ENDPOINT = `${PRODUCTS_ENDPOINT}/updateOne`;
+const DELETE_PRODUCT_FALLBACK_ENDPOINT = `${PRODUCTS_ENDPOINT}/deleteOne`;
 
 const parseNumber = (value) => {
   if (value === null || value === undefined) return null;
@@ -109,6 +111,11 @@ export async function createProduct(product) {
   }
 }
 
+const shouldUseFallback = (error) => {
+  const status = error?.response?.status;
+  return status === 404 || status === 405 || status === 501;
+};
+
 export async function updateProduct(id, product) {
   if (!id) {
     throw new Error("El identificador del producto es obligatorio.");
@@ -123,6 +130,27 @@ export async function updateProduct(id, product) {
       response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
     return normalizeProduct(updatedItem);
   } catch (error) {
+    if (shouldUseFallback(error)) {
+      try {
+        const response = await api.post(UPDATE_PRODUCT_FALLBACK_ENDPOINT, {
+          id,
+          documentId: id,
+          ...buildProductPayload(product),
+        });
+        const updatedItem =
+          response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
+        return normalizeProduct(updatedItem);
+      } catch (fallbackError) {
+        console.error("Error updating product (fallback):", fallbackError);
+        const err = new Error(
+          fallbackError?.friendlyMessage ||
+            fallbackError?.message ||
+            "No se pudo actualizar el producto."
+        );
+        err.cause = fallbackError;
+        throw err;
+      }
+    }
     console.error("Error updating product:", error);
     const err = new Error(
       error?.friendlyMessage || error?.message || "No se pudo actualizar el producto."
@@ -140,6 +168,24 @@ export async function deleteProduct(id) {
   try {
     await api.delete(`${PRODUCTS_ENDPOINT}/${id}`);
   } catch (error) {
+    if (shouldUseFallback(error)) {
+      try {
+        await api.post(DELETE_PRODUCT_FALLBACK_ENDPOINT, {
+          id,
+          documentId: id,
+        });
+        return;
+      } catch (fallbackError) {
+        console.error("Error deleting product (fallback):", fallbackError);
+        const err = new Error(
+          fallbackError?.friendlyMessage ||
+            fallbackError?.message ||
+            "No se pudo eliminar el producto."
+        );
+        err.cause = fallbackError;
+        throw err;
+      }
+    }
     console.error("Error deleting product:", error);
     const err = new Error(
       error?.friendlyMessage || error?.message || "No se pudo eliminar el producto."

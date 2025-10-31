@@ -6,7 +6,9 @@ const INVENTORY_ENDPOINT = "/bulkloadinventory/all";
 const CREATE_INVENTORY_ENDPOINT = "/bulkloadinventory/createOne";
 const INVENTORY_BASE_ENDPOINT = "/bulkloadinventory";
 const UPDATE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/updateOne/${id}`;
+const UPDATE_INVENTORY_FALLBACK_ENDPOINT = `${INVENTORY_BASE_ENDPOINT}/updateOne`;
 const DELETE_INVENTORY_ENDPOINT = (id) => `${INVENTORY_BASE_ENDPOINT}/deleteOne/${id}`;
+const DELETE_INVENTORY_FALLBACK_ENDPOINT = `${INVENTORY_BASE_ENDPOINT}/deleteOne`;
 
 const getStrapiBaseURL = () => {
   const baseURL = api.defaults?.baseURL ?? "";
@@ -358,6 +360,11 @@ export async function createInventoryRecord({ productId, product, quantity, vend
   }
 }
 
+const shouldUseFallback = (error) => {
+  const status = error?.response?.status;
+  return status === 404 || status === 405 || status === 501;
+};
+
 export async function updateInventoryRecord(id, { productId, product, quantity, vendor }) {
   if (!id) {
     throw new Error("El identificador del inventario es obligatorio.");
@@ -374,6 +381,34 @@ export async function updateInventoryRecord(id, { productId, product, quantity, 
 
     return normalizeInventoryItem(updatedItem);
   } catch (error) {
+    if (shouldUseFallback(error)) {
+      try {
+        const response = await api.post(
+          UPDATE_INVENTORY_FALLBACK_ENDPOINT,
+          {
+            id,
+            inventoryId: id,
+            documentId: id,
+            ...buildInventoryPayload({ productId, product, quantity, vendor }),
+          }
+        );
+
+        const updatedItem =
+          response?.data?.data ?? response?.data?.item ?? response?.data ?? null;
+
+        return normalizeInventoryItem(updatedItem);
+      } catch (fallbackError) {
+        console.error("Error updating inventory record (fallback):", fallbackError);
+        const err = new Error(
+          fallbackError?.friendlyMessage ||
+            fallbackError?.message ||
+            "No se pudo actualizar el registro de inventario."
+        );
+        err.cause = fallbackError;
+        throw err;
+      }
+    }
+
     console.error("Error updating inventory record:", error);
     const err = new Error(
       error?.friendlyMessage ||
@@ -393,6 +428,26 @@ export async function deleteInventoryRecord(id) {
   try {
     await api.delete(DELETE_INVENTORY_ENDPOINT(id));
   } catch (error) {
+    if (shouldUseFallback(error)) {
+      try {
+        await api.post(DELETE_INVENTORY_FALLBACK_ENDPOINT, {
+          id,
+          inventoryId: id,
+          documentId: id,
+        });
+        return;
+      } catch (fallbackError) {
+        console.error("Error deleting inventory record (fallback):", fallbackError);
+        const err = new Error(
+          fallbackError?.friendlyMessage ||
+            fallbackError?.message ||
+            "No se pudo eliminar el registro de inventario."
+        );
+        err.cause = fallbackError;
+        throw err;
+      }
+    }
+
     console.error("Error deleting inventory record:", error);
     const err = new Error(
       error?.friendlyMessage ||
